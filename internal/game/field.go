@@ -405,65 +405,6 @@ func drawHeart(dst *ebiten.Image, x, y, s float64, c color.RGBA) {
 	fillCircle(dst, x-r*1.0, y-r*0.6, r*0.3, rgba(255, 200, 210, 255))
 }
 
-func drawBeetle(dst *ebiten.Image, c sim.Chaser, t, ox, oy float64, st *sim.State) {
-	x, y := px(c.X)+ox, py(c.Y)+oy
-	if c.Spawn > 0 {
-		k := 1 - float64(c.Spawn%45)/45
-		strokeCircle(dst, x, y, 6+k*18, 3, withAlpha(rgba(255, 60, 60, 255), 1-k))
-		fillCircle(dst, x, y, 6, rgba(40, 20, 30, 200))
-		return
-	}
-	body := rgba(70, 40, 96, 255)
-	shell := rgba(110, 70, 150, 255)
-	eye := rgba(255, 70, 70, 255)
-	if c.Kind == sim.ChaserCunning {
-		body, shell, eye = rgba(36, 70, 48, 255), rgba(60, 120, 80, 255), rgba(150, 255, 110, 255)
-	}
-	if c.Stun > 0 {
-		body, shell = lerpColor(body, rgba(120, 120, 120, 255), 0.5), lerpColor(shell, rgba(150, 150, 150, 255), 0.5)
-	}
-	// Направление — к следующей клетке пути.
-	dx, dy := float64(c.TX)+0.5-c.X, float64(c.TY)+0.5-c.Y
-	if math.Hypot(dx, dy) < 0.05 {
-		dx, dy = st.P.X-c.X, st.P.Y-c.Y
-	}
-	ang := math.Atan2(dy, dx)
-	ca, sa := math.Cos(ang), math.Sin(ang)
-	rot := func(u, v float64) (float64, float64) { return x + u*ca - v*sa, y + u*sa + v*ca }
-	r := CellPx * 0.32
-	// Лапки.
-	for i := -1; i <= 1; i++ {
-		ph := math.Sin(t*0.4+float64(i)*2) * 4
-		for _, side := range []float64{-1, 1} {
-			x0, y0 := rot(float64(i)*r*0.5, side*r*0.5)
-			x1, y1 := rot(float64(i)*r*0.5+ph, side*r*1.15)
-			line(dst, x0, y0, x1, y1, 2.5, rgba(30, 18, 40, 255))
-		}
-	}
-	var pts []float64
-	for i := 0; i < 16; i++ {
-		a := float64(i) / 16 * 2 * math.Pi
-		u, v := rot(math.Cos(a)*r*1.05, math.Sin(a)*r*0.78)
-		pts = append(pts, u, v)
-	}
-	fillPoly(dst, pts, body)
-	sx0, sy0 := rot(-r*0.9, 0)
-	sx1, sy1 := rot(r*0.4, 0)
-	line(dst, sx0, sy0, sx1, sy1, 2, shell)
-	hx, hy := rot(r*0.75, 0)
-	fillCircle(dst, hx, hy, r*0.42, rgba(30, 18, 40, 255))
-	e1x, e1y := rot(r*0.95, -r*0.2)
-	e2x, e2y := rot(r*0.95, r*0.2)
-	fillCircle(dst, e1x, e1y, 3, eye)
-	fillCircle(dst, e2x, e2y, 3, eye)
-	if c.Stun > 0 {
-		for i := 0; i < 3; i++ {
-			a := t*0.15 + float64(i)*2.09
-			fillCircle(dst, x+math.Cos(a)*14, y-18+math.Sin(a)*4, 2.5, rgba(255, 240, 120, 255))
-		}
-	}
-}
-
 func caveRect(c sim.CaveIn, ox, oy float64) (float64, float64, float64, float64) {
 	if c.Horizontal {
 		return FieldX + ox, py(float64(c.Line)) + oy, FieldW, CellPx
