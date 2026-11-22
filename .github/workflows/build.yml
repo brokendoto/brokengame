@@ -19,7 +19,7 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Сборка Pyatimirye.exe
-        run: go build -trimpath -ldflags "-s -w -H=windowsgui" -o dist/Pyatimirye.exe ./cmd/pyatimirye
+        run: go build -trimpath -ldflags "-H=windowsgui" -o dist/Pyatimirye.exe ./cmd/pyatimirye
       - uses: actions/upload-artifact@v4
         with:
           name: Pyatimirye-windows
@@ -94,7 +94,7 @@ jobs:
           go vet -tags steam ./...
           GOOS=windows go vet -tags steam ./...
           mkdir -p steam/content/windows steam/content/linux
-          GOOS=windows GOARCH=amd64 go build -tags steam -trimpath -ldflags "-s -w -H=windowsgui" -o steam/content/windows/Pyatimirye.exe ./cmd/pyatimirye
+          GOOS=windows GOARCH=amd64 go build -tags steam -trimpath -ldflags "-H=windowsgui" -o steam/content/windows/Pyatimirye.exe ./cmd/pyatimirye
           go build -tags steam -trimpath -ldflags "-s -w" -o steam/content/linux/pyatimirye ./cmd/pyatimirye
       - uses: actions/upload-artifact@v4
         with:
