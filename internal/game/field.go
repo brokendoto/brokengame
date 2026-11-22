@@ -405,43 +405,6 @@ func drawHeart(dst *ebiten.Image, x, y, s float64, c color.RGBA) {
 	fillCircle(dst, x-r*1.0, y-r*0.6, r*0.3, rgba(255, 200, 210, 255))
 }
 
-// drawMiner рисует шахтёра. alpha<1 и ghost — для призрака.
-func drawMiner(dst *ebiten.Image, p sim.Player, x, y, t, alpha float64, ghost bool) {
-	r := CellPx * 0.32
-	bob := 0.0
-	if p.Moving {
-		bob = math.Sin(p.WalkDistance*9) * 1.8
-	}
-	y += bob
-	body := rgba(232, 138, 42, 255)
-	helmet := rgba(250, 210, 60, 255)
-	outline := rgba(30, 20, 15, 255)
-	if ghost {
-		body, helmet, outline = rgba(150, 200, 255, 255), rgba(210, 235, 255, 255), rgba(80, 120, 180, 255)
-	}
-	fillCircle(dst, x+2, y+4, r, withAlpha(rgba(0, 0, 0, 255), 0.3*alpha))
-	fillCircle(dst, x, y, r+2, withAlpha(outline, alpha))
-	fillCircle(dst, x, y, r, withAlpha(body, alpha))
-	// Ремни комбинезона.
-	line(dst, x-r*0.5, y-r*0.2, x-r*0.4, y+r*0.8, 3, withAlpha(rgba(60, 80, 140, 255), alpha))
-	line(dst, x+r*0.5, y-r*0.2, x+r*0.4, y+r*0.8, 3, withAlpha(rgba(60, 80, 140, 255), alpha))
-	// Каска сдвинута в сторону взгляда.
-	hx, hy := x+p.FX*r*0.25, y+p.FY*r*0.25-r*0.25
-	fillCircle(dst, hx, hy, r*0.72, withAlpha(outline, alpha))
-	fillCircle(dst, hx, hy, r*0.65, withAlpha(helmet, alpha))
-	fillCircle(dst, hx-r*0.2, hy-r*0.2, r*0.2, withAlpha(rgba(255, 245, 190, 255), alpha))
-	// Фонарь.
-	lx, ly := hx+p.FX*r*0.55, hy+p.FY*r*0.55
-	fillCircle(dst, lx, ly, r*0.24, withAlpha(rgba(255, 255, 230, 255), alpha))
-	if p.ShieldT > 0 && !ghost {
-		a := 0.6
-		if p.ShieldT < 60 && (p.ShieldT/6)%2 == 0 {
-			a = 0.2
-		}
-		strokeCircle(dst, x, y, r+9+math.Sin(t*0.3)*1.5, 3, withAlpha(colAccent, a))
-	}
-}
-
 func drawBeetle(dst *ebiten.Image, c sim.Chaser, t, ox, oy float64, st *sim.State) {
 	x, y := px(c.X)+ox, py(c.Y)+oy
 	if c.Spawn > 0 {
