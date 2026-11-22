@@ -2,6 +2,7 @@ package game
 
 import (
 	"math"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -22,6 +23,7 @@ type menuItem int
 const (
 	miCampaign menuItem = iota
 	miDaily
+	miMarathon
 	miDuel
 	miRecords
 	miDiff
@@ -40,7 +42,7 @@ type menuScene struct {
 }
 
 func newMenuScene() *menuScene {
-	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miAchievements, miDiff, miPlayer, miSettings}}
+	m := &menuScene{items: []menuItem{miCampaign, miDaily, miMarathon, miDuel, miRecords, miAchievements, miDiff, miPlayer, miSettings}}
 	if CanQuit() {
 		m.items = append(m.items, miQuit)
 	}
@@ -53,6 +55,8 @@ func (m *menuScene) label(a *App, it menuItem) string {
 		return "Играть: " + sim.Worlds[a.Prof.World].Name
 	case miDaily:
 		return "Испытание дня"
+	case miMarathon:
+		return "Марафон"
 	case miDuel:
 		return "Дуэль вдвоём"
 	case miRecords:
@@ -113,6 +117,8 @@ func (m *menuScene) Update(a *App) {
 		a.Goto(newLevelScene(a))
 	case miDaily:
 		a.Goto(newPlayScene(a, sim.DailyTrack(today())))
+	case miMarathon:
+		a.Goto(newMarathonPlay(a, newMarathonRun()))
 	case miDuel:
 		a.Goto(newDuelSetupScene(a))
 	case miRecords:
@@ -145,11 +151,11 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	drawText(dst, "Пять миров. Один рекорд.", 22, false, ScreenW/2, 176, Center, colDim)
 
 	// Пункты меню.
-	y0 := 236.0
+	y0 := 226.0
 	m.hits.reset()
 	for i, it := range m.items {
-		y := y0 + float64(i)*42
-		m.hits.add(rect{ScreenW/2 - 300, y - 8, 600, 42}, i)
+		y := y0 + float64(i)*39
+		m.hits.add(rect{ScreenW/2 - 300, y - 7, 600, 39}, i)
 		sel := i == m.sel
 		if sel {
 			w := textWidth(m.label(a, it), 24, true) + 60
@@ -160,7 +166,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 		if sel {
 			c = colText
 		}
-		if it == miCampaign || it == miDaily || it == miDuel {
+		if it == miCampaign || it == miDaily || it == miMarathon || it == miDuel {
 			if !sel {
 				c = colAccent
 			}
@@ -174,6 +180,14 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 		s := "Один уровень на весь день, одинаковый у всех. Побей лучший результат!"
 		if len(top) > 0 {
 			s = "Лидер дня: " + top[0].Name + " · " + fmtScore(top[0].Score) + " очков"
+		}
+		drawText(dst, s, 18, false, ScreenW/2, ScreenH-70, Center, colGold)
+	}
+	if m.items[m.sel] == miMarathon {
+		top := a.Rec.Top(sim.MarathonTrack(sim.MarathonWeek(time.Now()), 1).Key())
+		s := "Уровни подряд через все миры, жизни переносятся. Как далеко ты зайдёшь?"
+		if len(top) > 0 {
+			s = "Лидер недели: " + top[0].Name + " · " + itoa(top[0].Stages) + " " + stagesRu(top[0].Stages) + " · " + fmtScore(top[0].Score) + " очков"
 		}
 		drawText(dst, s, 18, false, ScreenW/2, ScreenH-70, Center, colGold)
 	}
@@ -688,7 +702,7 @@ func (n *nameScene) drawKeyboard(dst *ebiten.Image) {
 }
 
 // Version — версия игры.
-const Version = "0.7"
+const Version = "0.8"
 
 func versionText() string {
 	v := "v" + Version + " · Go + Ebitengine"

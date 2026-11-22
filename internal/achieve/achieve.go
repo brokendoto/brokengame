@@ -36,6 +36,8 @@ const (
 	PureSoul   ID = "pure_soul"
 	EventHoriz ID = "event_horizon"
 	Robot      ID = "robot"
+	Marathon5  ID = "marathon_5"
+	Marathon15 ID = "marathon_15"
 )
 
 // List — все достижения в порядке показа.
@@ -54,6 +56,8 @@ var List = []Info{
 	{TempleAll, "Путь самурая", "Пройди все уровни Ночного храма", false},
 	{FrontAll, "Ас передовой", "Пройди все уровни Руин передовой", false},
 	{SpaceAll, "Звёздный странник", "Пройди все уровни Открытого космоса", false},
+	{Marathon5, "Марафонец", "Пройди 5 этапов марафона за один забег", false},
+	{Marathon15, "Железная воля", "Пройди 15 этапов марафона за один забег", false},
 	{GoldWorld, "Золотой мир", "Получи золото на всех уровнях одного мира", false},
 	{AllGolden, "Ни жёлудя врагу", "Собери все золотые жёлуди на уровне леса", false},
 	{PureSoul, "Чистая душа", "Пройди уровень храма, не тронув проклятых душ", false},
@@ -117,7 +121,7 @@ func CheckRun(r Run) []ID {
 	}
 	if r.Track.Daily != "" {
 		out = append(out, Daily)
-	} else if r.Track.Level == sim.LevelsPerWorld && r.Track.Diff == sim.Hard {
+	} else if r.Track.Marathon == "" && r.Track.Level == sim.LevelsPerWorld && r.Track.Diff == sim.Hard {
 		out = append(out, HardFinale)
 	}
 	if r.GhostScore > 0 && res.Total > r.GhostScore {
@@ -137,6 +141,18 @@ func CheckRun(r Run) []ID {
 		if gold == sim.LevelsPerWorld {
 			out = append(out, GoldWorld)
 		}
+	}
+	return out
+}
+
+// CheckMarathon — достижения за число пройденных этапов марафона.
+func CheckMarathon(stages int) []ID {
+	var out []ID
+	if stages >= 5 {
+		out = append(out, Marathon5)
+	}
+	if stages >= 15 {
+		out = append(out, Marathon15)
 	}
 	return out
 }

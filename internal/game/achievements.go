@@ -84,7 +84,7 @@ func (s *achievementsScene) Draw(a *App, dst *ebiten.Image) {
 	got := a.Prof.Achievements
 	drawTextShadow(dst, "Достижения", 40, true, ScreenW/2, 14, Center, colText)
 	drawText(dst, "Получено "+itoa(len(got))+" из "+itoa(len(achieve.List)), 18, false, ScreenW/2, 64, Center, colGold)
-	const colW, rowH = 590.0, 56.0
+	const colW, rowH = 590.0, 51.0
 	perCol := (len(achieve.List) + 1) / 2
 	for i, info := range achieve.List {
 		x := 40 + float64(i/perCol)*(colW+20)
@@ -94,8 +94,8 @@ func (s *achievementsScene) Draw(a *App, dst *ebiten.Image) {
 		if has {
 			bg = rgba(52, 42, 30, 235)
 		}
-		roundRect(dst, x, y, colW, rowH-6, 10, bg)
-		drawTrophy(dst, x+30, y+24, 0.8, has)
+		roundRect(dst, x, y, colW, rowH-5, 10, bg)
+		drawTrophy(dst, x+30, y+23, 0.75, has)
 		nc, desc := colDim, info.Desc
 		if has {
 			nc = colText
@@ -103,7 +103,7 @@ func (s *achievementsScene) Draw(a *App, dst *ebiten.Image) {
 			desc = "Секретное достижение"
 		}
 		drawText(dst, info.Name, 19, true, x+60, y+4, Left, nc)
-		drawText(dst, desc, 14, false, x+60, y+27, Left, colDim)
+		drawText(dst, desc, 14, false, x+60, y+26, Left, colDim)
 		right := ""
 		if has {
 			right = date
