@@ -702,7 +702,7 @@ func (n *nameScene) drawKeyboard(dst *ebiten.Image) {
 }
 
 // Version — версия игры.
-const Version = "0.9"
+const Version = "0.10"
 
 func versionText() string {
 	v := "v" + Version + " · Go + Ebitengine"

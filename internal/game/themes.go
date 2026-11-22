@@ -330,70 +330,6 @@ func ellipse(x, y, rx, ry, ang float64, n int) []float64 {
 
 // --- герои -----------------------------------------------------------------
 
-func drawHero(dst *ebiten.Image, w sim.World, p sim.Player, x, y, t, alpha float64, ghost bool) {
-	if w == sim.Mine {
-		drawMiner(dst, p, x, y, t, alpha, ghost)
-		return
-	}
-	r := CellPx * 0.32
-	if p.Moving {
-		y += math.Sin(p.WalkDistance*9) * 1.8
-	}
-	a := func(c rgbaT) rgbaT {
-		if ghost {
-			c = lerpColor(c, rgba(170, 210, 255, 255), 0.7)
-		}
-		return withAlpha(c, alpha)
-	}
-	fx, fy := p.FX, p.FY
-	fillCircle(dst, x+2, y+4, r, withAlpha(rgba(0, 0, 0, 255), 0.3*alpha))
-	switch w {
-	case sim.Forest: // белочка с пушистым хвостом
-		tx, ty := x-fx*r*0.9, y-fy*r*0.9-r*0.3
-		fillCircle(dst, tx, ty, r*0.75, a(rgba(150, 80, 30, 255)))
-		fillCircle(dst, tx-fx*r*0.3, ty-r*0.35, r*0.55, a(rgba(190, 110, 45, 255)))
-		fillCircle(dst, x, y, r+2, a(rgba(60, 30, 10, 255)))
-		fillCircle(dst, x, y, r, a(rgba(214, 120, 50, 255)))
-		fillCircle(dst, x+fx*r*0.2, y+fy*r*0.2+r*0.25, r*0.45, a(rgba(250, 220, 180, 255)))
-		hx, hy := x+fx*r*0.45, y+fy*r*0.45-r*0.3
-		fillPoly(dst, []float64{hx - r*0.55, hy - r*0.2, hx - r*0.35, hy - r*0.85, hx - r*0.1, hy - r*0.3}, a(rgba(170, 90, 35, 255)))
-		fillPoly(dst, []float64{hx + r*0.55, hy - r*0.2, hx + r*0.35, hy - r*0.85, hx + r*0.1, hy - r*0.3}, a(rgba(170, 90, 35, 255)))
-		fillCircle(dst, hx-r*0.2+fx*3, hy+fy*3, 2.5, a(rgba(20, 10, 5, 255)))
-		fillCircle(dst, hx+r*0.2+fx*3, hy+fy*3, 2.5, a(rgba(20, 10, 5, 255)))
-	case sim.Temple: // ронин в соломенной шляпе
-		line(dst, x-fx*r*0.2-fy*r*0.7, y-fy*r*0.2+fx*r*0.7, x-fx*r*1.4-fy*r*0.3, y-fy*r*1.4+fx*r*0.3, 3, a(rgba(200, 200, 210, 255)))
-		fillCircle(dst, x, y, r+2, a(rgba(10, 10, 20, 255)))
-		fillCircle(dst, x, y, r, a(rgba(50, 56, 110, 255)))
-		hx, hy := x+fx*r*0.2, y+fy*r*0.2-r*0.2
-		fillCircle(dst, hx, hy, r*0.95, a(rgba(90, 70, 40, 255)))
-		fillCircle(dst, hx, hy, r*0.88, a(rgba(214, 180, 110, 255)))
-		strokeCircle(dst, hx, hy, r*0.5, 1.5, a(rgba(150, 120, 70, 255)))
-		fillCircle(dst, hx, hy, r*0.2, a(rgba(190, 150, 90, 255)))
-	case sim.Front: // пилот в шлеме с очками
-		sx, sy := x-fx*r*0.8, y-fy*r*0.8
-		line(dst, x, y-r*0.1, sx+math.Sin(t*0.3)*3, sy+math.Cos(t*0.3)*3, 5, a(rgba(200, 40, 40, 255)))
-		fillCircle(dst, x, y, r+2, a(rgba(20, 24, 14, 255)))
-		fillCircle(dst, x, y, r, a(rgba(110, 120, 70, 255)))
-		hx, hy := x+fx*r*0.25, y+fy*r*0.25-r*0.2
-		fillCircle(dst, hx, hy, r*0.65, a(rgba(80, 60, 40, 255)))
-		gx, gy := hx+fx*r*0.35, hy+fy*r*0.35
-		fillCircle(dst, gx-fy*r*0.25, gy+fx*r*0.25, r*0.2, a(rgba(120, 230, 255, 255)))
-		fillCircle(dst, gx+fy*r*0.25, gy-fx*r*0.25, r*0.2, a(rgba(120, 230, 255, 255)))
-	case sim.Space: // космонавт
-		bx, by := x-fx*r*0.75, y-fy*r*0.75
-		roundRect(dst, bx-r*0.45, by-r*0.45, r*0.9, r*0.9, 4, a(rgba(150, 150, 160, 255)))
-		fillCircle(dst, x, y, r+2, a(rgba(60, 60, 70, 255)))
-		fillCircle(dst, x, y, r, a(rgba(240, 240, 245, 255)))
-		hx, hy := x+fx*r*0.3, y+fy*r*0.3-r*0.15
-		fillCircle(dst, hx, hy, r*0.62, a(rgba(220, 220, 230, 255)))
-		fillCircle(dst, hx+fx*r*0.2, hy+fy*r*0.2, r*0.42, a(rgba(40, 90, 200, 255)))
-		fillCircle(dst, hx+fx*r*0.1-r*0.12, hy+fy*r*0.1-r*0.12, r*0.12, a(rgba(200, 230, 255, 255)))
-	}
-	if p.ShieldT > 0 && !ghost {
-		strokeCircle(dst, x, y, r+9+math.Sin(t*0.3)*1.5, 3, withAlpha(colAccent, 0.6))
-	}
-}
-
 // --- враги -----------------------------------------------------------------
 
 func drawEnemy(dst *ebiten.Image, w sim.World, c sim.Chaser, t, ox, oy float64, st *sim.State) {
@@ -409,6 +345,9 @@ func drawEnemy(dst *ebiten.Image, w sim.World, c sim.Chaser, t, ox, oy float64, 
 		return
 	}
 	x, y := px(c.X)+ox, py(c.Y)+oy
+	if c.Kind == sim.ChaserBasic || (w != sim.Temple && w != sim.Space) {
+		fillPoly(dst, ellipse(x+2, y+13, 14, 5, 0, 16), rgba(0, 0, 0, 70))
+	}
 	dx, dy := float64(c.TX)+0.5-c.X, float64(c.TY)+0.5-c.Y
 	if math.Hypot(dx, dy) < 0.05 {
 		dx, dy = st.P.X-c.X, st.P.Y-c.Y
