@@ -88,3 +88,15 @@ func TestEventsCounters(t *testing.T) {
 		t.Error("условия со счётчиками не проверяются")
 	}
 }
+
+// Идентификаторы идут в Steam как API-имена достижений: только латиница,
+// цифры и подчёркивание.
+func TestSteamAPINames(t *testing.T) {
+	for _, a := range List {
+		for _, c := range a.ID {
+			if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+				t.Fatalf("%q не годится как API-имя Steam", a.ID)
+			}
+		}
+	}
+}
