@@ -23,6 +23,7 @@ type setItem int
 
 const (
 	siVolume setItem = iota
+	siMusic
 	siSound
 	siShake
 	siGhost
@@ -42,7 +43,7 @@ type settingsScene struct {
 }
 
 func newSettingsScene() *settingsScene {
-	s := &settingsScene{items: []setItem{siVolume, siSound, siShake, siGhost}}
+	s := &settingsScene{items: []setItem{siVolume, siMusic, siSound, siShake, siGhost}}
 	if !IsMobile() {
 		// На телефоне нет полного экрана и физической клавиатуры.
 		s.items = append(s.items, siFullscreen, siKeysSolo, siKeysDuel1, siKeysDuel2, siKeysReset)
@@ -62,6 +63,8 @@ func (s *settingsScene) label(a *App, it setItem) string {
 	switch it {
 	case siVolume:
 		return "Громкость:  ‹ " + itoa(a.Prof.Volume) + "% ›"
+	case siMusic:
+		return "Музыка:  ‹ " + itoa(a.Prof.Music) + "% ›"
 	case siSound:
 		return "Звук: " + onOff(!a.Sound.Muted)
 	case siShake:
@@ -95,7 +98,7 @@ func (s *settingsScene) Update(a *App) {
 		a.Sound.Play(sfx.Menu)
 	}
 	it := s.items[s.sel]
-	if it == siVolume {
+	if it == siVolume || it == siMusic {
 		d := 0
 		if s.nav.dir(navLeft) {
 			d = -10
@@ -103,8 +106,10 @@ func (s *settingsScene) Update(a *App) {
 		if s.nav.dir(navRight) {
 			d = 10
 		}
-		if d != 0 {
+		if d != 0 && it == siVolume {
 			s.setVolume(a, a.Prof.Volume+d)
+		} else if d != 0 {
+			s.setMusic(a, a.Prof.Music+d)
 		}
 	}
 	if backPressed() {
@@ -128,6 +133,12 @@ func (s *settingsScene) Update(a *App) {
 			v = 0
 		}
 		s.setVolume(a, v)
+	case siMusic:
+		v := a.Prof.Music + 10
+		if v > 100 {
+			v = 0
+		}
+		s.setMusic(a, v)
 	case siSound:
 		a.SetMuted(!a.Sound.Muted)
 	case siShake:
@@ -158,6 +169,12 @@ func (s *settingsScene) Update(a *App) {
 func (s *settingsScene) setVolume(a *App, v int) {
 	a.Prof.Volume = min(100, max(0, v))
 	a.applySettings()
+	_ = a.Prof.Save()
+	a.Sound.Play(sfx.Menu)
+}
+
+func (s *settingsScene) setMusic(a *App, v int) {
+	a.Prof.Music = min(100, max(0, v))
 	_ = a.Prof.Save()
 	a.Sound.Play(sfx.Menu)
 }
