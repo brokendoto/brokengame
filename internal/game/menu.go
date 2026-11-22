@@ -8,6 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
 )
@@ -56,7 +57,7 @@ func (m *menuScene) label(a *App, it menuItem) string {
 	}
 	switch it {
 	case miCampaign:
-		return "Играть: " + sim.Worlds[sim.Mine].Name
+		return "Играть: " + sim.Worlds[a.Prof.World].Name
 	case miDaily:
 		return "Испытание дня"
 	case miRecords:
@@ -144,8 +145,11 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	// Заголовок с кристаллами по бокам.
 	glow(dst, ScreenW/2, 120, 360, rgba(80, 60, 160, 255), 0.35)
 	drawTextShadow(dst, "ПЯТИМИРЬЕ", 84, true, ScreenW/2, 70, Center, colText)
-	drawCrystal(dst, ScreenW/2-330, 118+math.Sin(t*0.05)*5, 1.4, t)
-	drawCrystal(dst, ScreenW/2+330, 118+math.Sin(t*0.05+2)*5, 1.4, t+40)
+	// По бокам — предметы всех пяти миров по очереди.
+	wl := sim.World((a.Frame / 180) % int(sim.WorldCount))
+	wr := (wl + 2) % sim.WorldCount
+	drawItem(dst, wl, ScreenW/2-330, 118+math.Sin(t*0.05)*5, 1.4, t, 0)
+	drawItem(dst, wr, ScreenW/2+330, 118+math.Sin(t*0.05+2)*5, 1.4, t+40, 0)
 	drawText(dst, "Пять миров. Один рекорд.", 22, false, ScreenW/2, 176, Center, colDim)
 
 	// Пункты меню.
@@ -186,24 +190,54 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	} else {
 		keyHint(dst, "↑↓ — выбор   ·   Enter — ок   ·   ←→ — сложность   ·   F11 — полный экран   ·   M — звук")
 	}
-	drawText(dst, "v0.2 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
+	drawText(dst, "v0.3 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
 }
 
 // --- Выбор уровня ------------------------------------------------------------
 
 type levelScene struct {
-	sel  int
-	nav  nav
-	hits hits
+	world sim.World
+	sel   int
+	nav   nav
+	hits  hits
 }
 
 const (
 	hitBack = 100 + iota
 	hitDiff
+	hitWorldPrev
+	hitWorldNext
+	hitWorld = 200 // +номер мира
 )
 
 func newLevelScene(a *App) *levelScene {
-	return &levelScene{sel: a.Prof.UnlockedLevel(sim.Mine, a.Prof.Diff) - 1}
+	l := &levelScene{world: a.Prof.World}
+	l.sel = a.Prof.UnlockedLevel(l.world, a.Prof.Diff) - 1
+	return l
+}
+
+// worldSwitch — смена мира клавишами Q/E, PageUp/PageDown или бамперами геймпада.
+func worldSwitch() int {
+	if inpututil.IsKeyJustPressed(ebiten.KeyQ) || inpututil.IsKeyJustPressed(ebiten.KeyPageUp) || padJust(ebiten.StandardGamepadButtonFrontTopLeft) {
+		return -1
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyE) || inpututil.IsKeyJustPressed(ebiten.KeyPageDown) || padJust(ebiten.StandardGamepadButtonFrontTopRight) {
+		return 1
+	}
+	return 0
+}
+
+func (l *levelScene) setWorld(a *App, w sim.World) {
+	if w == l.world {
+		return
+	}
+	l.world = w
+	l.sel = a.Prof.UnlockedLevel(w, a.Prof.Diff) - 1
+	if a.Prof.WorldOpen(w) {
+		a.Prof.World = w
+		_ = a.Prof.Save()
+	}
+	a.Sound.Play(sfx.Menu)
 }
 
 func (l *levelScene) Update(a *App) {
@@ -228,9 +262,16 @@ func (l *levelScene) Update(a *App) {
 	if moved {
 		a.Sound.Play(sfx.Menu)
 	}
+	if d := worldSwitch(); d != 0 {
+		l.setWorld(a, (l.world+sim.World(d)+sim.WorldCount)%sim.WorldCount)
+	}
 	tap, tapped := l.hits.tapped(a)
 	if tapped && tap == hitBack {
 		a.Goto(newMenuScene())
+		return
+	}
+	if tapped && tap >= hitWorld && tap < hitWorld+int(sim.WorldCount) {
+		l.setWorld(a, sim.World(tap-hitWorld))
 		return
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) || (tapped && tap == hitDiff) {
@@ -247,32 +288,56 @@ func (l *levelScene) Update(a *App) {
 		l.sel, play = tap, true
 	}
 	if play {
-		if l.sel+1 > a.Prof.UnlockedLevel(sim.Mine, a.Prof.Diff) {
+		if !a.Prof.WorldOpen(l.world) {
+			a.Toast(lockedWorldHint(l.world))
+			return
+		}
+		if l.sel+1 > a.Prof.UnlockedLevel(l.world, a.Prof.Diff) {
 			a.Toast("Сначала пройди предыдущий уровень")
 			return
 		}
 		a.Sound.Play(sfx.Select)
-		a.Goto(newPlayScene(a, sim.Track{World: sim.Mine, Level: l.sel + 1, Diff: a.Prof.Diff}))
+		a.Goto(newPlayScene(a, sim.Track{World: l.world, Level: l.sel + 1, Diff: a.Prof.Diff}))
 	}
+}
+
+func lockedWorldHint(w sim.World) string {
+	return "Пройди " + itoa(save.LevelsToUnlockWorld) + " уровня мира «" + sim.Worlds[w-1].Name + "», чтобы открыть этот мир"
 }
 
 func (l *levelScene) Draw(a *App, dst *ebiten.Image) {
 	a.drawBackground(dst)
+	th := &themes[l.world]
+	glow(dst, ScreenW/2, 400, 700, th.itemGlow, 0.08)
 	l.hits.reset()
-	// Пять миров — вкладки, пока открыт первый.
+	t := float64(a.Frame)
+	// Пять миров — вкладки.
 	for i, w := range sim.Worlds {
-		x := 140 + float64(i)*220
+		wi := sim.World(i)
+		x := 140 + float64(i)*250
+		open := a.Prof.WorldOpen(wi)
+		sel := wi == l.world
 		c, bg := colDim, rgba(30, 26, 40, 230)
-		if i == int(sim.Mine) {
-			c, bg = colText, rgba(60, 46, 96, 240)
+		if sel {
+			c, bg = colText, lerpColor(rgba(60, 46, 96, 240), themes[wi].wall, 0.35)
 		}
-		roundRect(dst, x-100, 24, 200, 54, 12, bg)
-		drawText(dst, w.Name, 17, i == int(sim.Mine), x, 32, Center, c)
-		sub := w.Hero
-		if !w.Ready {
-			sub = "скоро"
+		roundRect(dst, x-115, 20, 230, 60, 12, bg)
+		if sel {
+			roundRectStroke(dst, x-115, 20, 230, 60, 12, 2, themes[wi].itemGlow)
 		}
-		drawText(dst, sub, 14, false, x, 54, Center, colDim)
+		l.hits.add(rect{x - 115, 14, 230, 72}, hitWorld+i)
+		if open {
+			drawItem(dst, wi, x-90, 50, 0.55, t, 0)
+		} else {
+			fillRect(dst, x-99, 48, 18, 14, rgba(90, 84, 100, 255))
+			strokeCircle(dst, x-90, 47, 6, 3, rgba(90, 84, 100, 255))
+		}
+		drawText(dst, w.Name, 17, sel, x+10, 28, Center, c)
+		sub := w.Hero + " · " + sim.Abilities[sim.WorldRules[wi].Ability].Name
+		if !open {
+			sub = "закрыт"
+		}
+		drawText(dst, sub, 14, false, x+10, 52, Center, colDim)
 	}
 	diff := sim.Difficulties[a.Prof.Diff]
 	diffHint := "  (Tab — сменить)"
@@ -282,25 +347,44 @@ func (l *levelScene) Draw(a *App, dst *ebiten.Image) {
 	drawText(dst, "Сложность: "+diff.Name+diffHint, 18, false, ScreenW/2, 96, Center, colDim)
 	l.hits.add(rect{ScreenW/2 - 250, 88, 500, 40}, hitDiff)
 
-	unlocked := a.Prof.UnlockedLevel(sim.Mine, a.Prof.Diff)
+	if !a.Prof.WorldOpen(l.world) {
+		drawPanel(dst, ScreenW/2-360, 200, 720, 320)
+		fillRect(dst, ScreenW/2-30, 260, 60, 48, rgba(90, 84, 100, 255))
+		strokeCircle(dst, ScreenW/2, 258, 20, 7, rgba(90, 84, 100, 255))
+		drawText(dst, sim.Worlds[l.world].Name+" пока закрыт", 28, true, ScreenW/2, 340, Center, colText)
+		drawText(dst, lockedWorldHint(l.world), 18, false, ScreenW/2, 390, Center, colDim)
+		r := sim.WorldRules[l.world]
+		drawText(dst, "Здесь: "+r.ZoneName+", способность «"+sim.Abilities[r.Ability].Name+"»", 18, false, ScreenW/2, 430, Center, colAccent)
+	} else {
+		l.drawCards(a, dst)
+	}
+	if a.Pointer.touchMode {
+		drawBackButton(dst, &l.hits, hitBack)
+	} else {
+		keyHint(dst, "Стрелки — уровень   ·   Q/E — мир   ·   Enter — играть   ·   Tab — сложность   ·   Esc — назад")
+	}
+}
+
+func (l *levelScene) drawCards(a *App, dst *ebiten.Image) {
+	th := &themes[l.world]
+	unlocked := a.Prof.UnlockedLevel(l.world, a.Prof.Diff)
 	for i := 0; i < sim.LevelsPerWorld; i++ {
 		x := 100 + float64(i%4)*280
 		y := 140 + float64(i/4)*250
-		tr := sim.Track{World: sim.Mine, Level: i + 1, Diff: a.Prof.Diff}
+		tr := sim.Track{World: l.world, Level: i + 1, Diff: a.Prof.Diff}
 		locked := i+1 > unlocked
 		l.hits.add(rect{x, y, 240, 220}, i)
-		bg := rgba(32, 27, 42, 235)
+		bg := lerpColor(rgba(32, 27, 42, 235), th.floorB, 0.3)
 		if i == l.sel {
-			bg = rgba(62, 48, 100, 245)
-			glow(dst, x+120, y+110, 200, rgba(120, 90, 255, 255), 0.18)
+			bg = lerpColor(rgba(62, 48, 100, 245), th.wall, 0.3)
+			glow(dst, x+120, y+110, 200, th.itemGlow, 0.15)
 		}
 		roundRect(dst, x, y, 240, 220, 16, bg)
 		if i == l.sel {
-			roundRectStroke(dst, x, y, 240, 220, 16, 3, colAccent)
+			roundRectStroke(dst, x, y, 240, 220, 16, 3, th.itemGlow)
 		}
 		drawText(dst, "Уровень "+itoa(i+1), 26, true, x+120, y+16, Center, colText)
 		if locked {
-			// Замок.
 			fillRect(dst, x+100, y+100, 40, 32, rgba(90, 84, 100, 255))
 			strokeCircle(dst, x+120, y+98, 14, 5, rgba(90, 84, 100, 255))
 			drawText(dst, "закрыт", 18, false, x+120, y+150, Center, colDim)
@@ -320,29 +404,27 @@ func (l *levelScene) Draw(a *App, dst *ebiten.Image) {
 			drawText(dst, "лидер: "+top[0].Name, 14, false, x+120, y+192, Center, colGold)
 		}
 	}
-	if a.Pointer.touchMode {
-		drawBackButton(dst, &l.hits, hitBack)
-	} else {
-		keyHint(dst, "Стрелки — выбор   ·   Enter — играть   ·   Tab — сложность   ·   Esc — назад")
-	}
 }
 
 // --- Таблицы рекордов ---------------------------------------------------------
 
 type recordsScene struct {
-	sel  int // 0 — испытание дня, 1..8 — уровни
-	diff sim.Difficulty
-	nav  nav
-	hits hits
+	world sim.World
+	sel   int // 0 — испытание дня, 1..8 — уровни
+	diff  sim.Difficulty
+	nav   nav
+	hits  hits
 }
 
-func newRecordsScene(a *App) *recordsScene { return &recordsScene{diff: a.Prof.Diff} }
+func newRecordsScene(a *App) *recordsScene {
+	return &recordsScene{diff: a.Prof.Diff, world: a.Prof.World}
+}
 
 func (r *recordsScene) track() sim.Track {
 	if r.sel == 0 {
 		return sim.DailyTrack(today())
 	}
-	return sim.Track{World: sim.Mine, Level: r.sel, Diff: r.diff}
+	return sim.Track{World: r.world, Level: r.sel, Diff: r.diff}
 }
 
 func (r *recordsScene) Update(a *App) {
@@ -362,6 +444,10 @@ func (r *recordsScene) Update(a *App) {
 		r.diff = (r.diff + 1) % sim.DifficultyCount
 		a.Sound.Play(sfx.Menu)
 	}
+	if d := worldSwitch(); d != 0 {
+		r.world = (r.world + sim.World(d) + sim.WorldCount) % sim.WorldCount
+		a.Sound.Play(sfx.Menu)
+	}
 	if id, ok := r.hits.tapped(a); ok {
 		switch {
 		case id == hitBack:
@@ -369,6 +455,10 @@ func (r *recordsScene) Update(a *App) {
 			return
 		case id == hitDiff:
 			r.diff = (r.diff + 1) % sim.DifficultyCount
+		case id == hitWorldPrev:
+			r.world = (r.world + sim.WorldCount - 1) % sim.WorldCount
+		case id == hitWorldNext:
+			r.world = (r.world + 1) % sim.WorldCount
 		default:
 			r.sel = id
 		}
@@ -382,17 +472,24 @@ func (r *recordsScene) Update(a *App) {
 func (r *recordsScene) Draw(a *App, dst *ebiten.Image) {
 	a.drawBackground(dst)
 	drawText(dst, "Таблицы рекордов", 40, true, ScreenW/2, 24, Center, colText)
-	drawPanel(dst, 60, 90, 320, 560)
+	drawPanel(dst, 60, 90, 320, 580)
 	r.hits.reset()
+	// Переключатель мира.
+	drawText(dst, "‹", 30, true, 92, 100, Center, colAccent)
+	drawText(dst, "›", 30, true, 348, 100, Center, colAccent)
+	drawItem(dst, r.world, 130, 120, 0.5, float64(a.Frame), 0)
+	drawText(dst, sim.Worlds[r.world].Name, 19, true, 228, 108, Center, colText)
+	r.hits.add(rect{64, 94, 60, 52}, hitWorldPrev)
+	r.hits.add(rect{316, 94, 60, 52}, hitWorldNext)
 	for i := 0; i <= sim.LevelsPerWorld; i++ {
-		y := 110 + float64(i)*58
-		r.hits.add(rect{70, y - 12, 300, 56}, i)
+		y := 166 + float64(i)*54
+		r.hits.add(rect{70, y - 10, 300, 52}, i)
 		name := "Испытание дня"
 		if i > 0 {
-			name = "Шахта · уровень " + itoa(i)
+			name = themes[r.world].short + " · уровень " + itoa(i)
 		}
 		if i == r.sel {
-			roundRect(dst, 74, y-8, 292, 46, 10, rgba(62, 48, 100, 245))
+			roundRect(dst, 74, y-8, 292, 44, 10, rgba(62, 48, 100, 245))
 		}
 		c := colDim
 		if i == r.sel {
@@ -400,7 +497,7 @@ func (r *recordsScene) Draw(a *App, dst *ebiten.Image) {
 		}
 		drawText(dst, name, 20, i == r.sel, 92, y, Left, c)
 	}
-	drawPanel(dst, 410, 90, 810, 560)
+	drawPanel(dst, 410, 90, 810, 580)
 	tr := r.track()
 	title := tr.Title()
 	drawText(dst, title, 22, true, 815, 108, Center, colText)
@@ -414,7 +511,7 @@ func (r *recordsScene) Draw(a *App, dst *ebiten.Image) {
 	if a.Pointer.touchMode {
 		drawBackButton(dst, &r.hits, hitBack)
 	} else {
-		keyHint(dst, "↑↓ — трасса   ·   ←→ — сложность   ·   Esc — назад")
+		keyHint(dst, "↑↓ — трасса   ·   Q/E — мир   ·   ←→ — сложность   ·   Esc — назад")
 	}
 }
 

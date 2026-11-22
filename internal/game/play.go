@@ -151,7 +151,7 @@ func (s *playScene) handleEvents(a *App) {
 		switch e.Kind {
 		case sim.EvPickup:
 			a.Sound.PlayPickup(e.N)
-			s.fx.burst(x, y, 16, crystalBody, 5, 3, true)
+			s.fx.burst(x, y, 16, themes[s.track.World].itemGlow, 5, 3, true)
 			pts := int(100 * (1 + 0.25*float64(min(e.N, 9)-1)))
 			c := colText
 			if e.N >= 3 {
@@ -161,7 +161,7 @@ func (s *playScene) handleEvents(a *App) {
 		case sim.EvExitOpen:
 			a.Sound.Play(sfx.ExitOpen)
 			s.fx.burst(x, y, 40, exitGlow, 7, 4, true)
-			s.banner, s.bannerT = "Все кристаллы собраны — к выходу!", 120
+			s.banner, s.bannerT = "Все "+sim.Worlds[s.track.World].ItemsPl+" собраны — к выходу!", 120
 		case sim.EvHit:
 			a.Sound.Play(sfx.Hit)
 			s.fx.shake, s.fx.flash = 14, 1
@@ -171,10 +171,46 @@ func (s *playScene) handleEvents(a *App) {
 			s.fx.burst(x, y, 14, colAccent, 6, 3, true)
 		case sim.EvDash:
 			a.Sound.Play(sfx.Dash)
-			s.fx.debris(x, y+10, 6, rgba(120, 104, 90, 255))
-		case sim.EvShield:
-			a.Sound.Play(sfx.Shield)
-			s.fx.burst(x, y, 20, colAccent, 4, 3, true)
+			s.fx.debris(x, y+10, 6, themes[s.track.World].speck)
+		case sim.EvAbility:
+			ab := sim.Ability(e.N)
+			c := abilityColor(ab)
+			switch ab {
+			case sim.AbBlink:
+				a.Sound.Play(sfx.Dash)
+				s.fx.burst(x, y, 24, c, 5, 3, true)
+			case sim.AbPulse:
+				a.Sound.Play(sfx.Crash)
+				s.fx.shake = math.Max(s.fx.shake, 5)
+				for i := 0; i < 3; i++ {
+					s.fx.burst(x, y, 24, c, 8+float64(i)*3, 3, true)
+				}
+			default:
+				a.Sound.Play(sfx.Shield)
+				s.fx.burst(x, y, 20, c, 4, 3, true)
+			}
+		case sim.EvBlinkOut:
+			s.fx.burst(x, y, 14, themes[s.track.World].eyeSpecial, 4, 3, true)
+		case sim.EvBlinkIn:
+			if e.N == 1 {
+				a.Sound.Play(sfx.Warn)
+			} else {
+				s.fx.burst(x, y, 14, themes[s.track.World].eyeSpecial, 4, 3, true)
+			}
+		case sim.EvCursed:
+			a.Sound.Play(sfx.Hit)
+			s.fx.burst(x, y, 18, rgba(255, 60, 140, 255), 5, 3, true)
+			s.fx.text("−5 с", x, y-30, colRed, 24)
+			s.fx.shake = math.Max(s.fx.shake, 5)
+		case sim.EvGolden:
+			a.Sound.PlayPickup(e.N + 2)
+			s.fx.burst(x, y, 24, colGold, 6, 3, true)
+			pts := int(sim.GoldenScore * (1 + 0.25*float64(min(e.N, 9)-1)))
+			s.fx.text("+"+itoa(pts), x, y-30, colGold, 24)
+		case sim.EvVanish:
+			s.fx.burst(x, y, 10, withAlpha(colGold, 0.6), 3, 2, true)
+		case sim.EvHole:
+			s.fx.burst(x, y, 30, rgba(170, 90, 255, 255), 6, 4, true)
 		case sim.EvRockWarn, sim.EvCaveWarn:
 			a.Sound.Play(sfx.Warn)
 		case sim.EvRockBreak:
@@ -229,7 +265,7 @@ func (s *playScene) updatePause(a *App) {
 }
 
 func (s *playScene) Draw(a *App, dst *ebiten.Image) {
-	dst.Fill(rgba(12, 10, 14, 255))
+	dst.Fill(themes[s.track.World].bg)
 	var ghost *sim.State
 	if s.ghost != nil && s.ghost.Status == sim.Playing {
 		ghost = s.ghost
@@ -237,7 +273,7 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 	s.view.drawWorld(dst, s.st, ghost, a.Frame, s.fx, s.trail, s.ghostEntry.Name)
 	s.drawHUD(a, dst)
 	if a.Pointer.touchMode && s.st.Status == sim.Playing && !s.paused {
-		s.touch.draw(dst, s.st.P.DashCD, s.st.P.AbilityCD)
+		s.touch.draw(dst, s.st.P.DashCD, s.st.P.AbilityCD, s.lv.Rules().Ability)
 		// Значок паузы: нажатие на верхнюю панель ставит игру на паузу.
 		fillRect(dst, 580, 18, 6, 20, withAlpha(colDim, 0.7))
 		fillRect(dst, 591, 18, 6, 20, withAlpha(colDim, 0.7))
@@ -249,10 +285,17 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 		size := int(80 + 40*k)
 		drawTextShadow(dst, itoa(n), size, true, ScreenW/2, ScreenH/2-float64(size)/2, Center, withAlpha(colText, 0.4+0.6*k))
 		drawTextShadow(dst, s.track.Title(), 22, false, ScreenW/2, ScreenH/2+70, Center, colText)
-		goal := "Собери все кристаллы (" + itoa(len(s.lv.Items)) + ") и доберись до выхода"
+		w := s.track.World
+		goal := "Собери все " + sim.Worlds[w].ItemsPl + " (" + itoa(len(s.lv.Items)) + ") и доберись до выхода"
 		drawTextShadow(dst, goal, 18, false, ScreenW/2, ScreenH/2+104, Center, colDim)
+		ab := sim.Abilities[s.lv.Rules().Ability]
+		key := "E"
+		if a.Pointer.touchMode {
+			key = "кнопка"
+		}
+		drawTextShadow(dst, sim.Worlds[w].Hero+": «"+ab.Name+"» ("+key+") — "+ab.Hint, 16, false, ScreenW/2, ScreenH/2+130, Center, abilityColor(s.lv.Rules().Ability))
 		if s.ghost != nil {
-			drawTextShadow(dst, "Соперник-призрак: "+s.ghostEntry.Name+" · "+fmtScore(s.ghostEntry.Score)+" очков", 18, false, ScreenW/2, ScreenH/2+134, Center, rgba(170, 210, 255, 255))
+			drawTextShadow(dst, "Соперник-призрак: "+s.ghostEntry.Name+" · "+fmtScore(s.ghostEntry.Score)+" очков", 18, false, ScreenW/2, ScreenH/2+160, Center, rgba(170, 210, 255, 255))
 		}
 	} else if s.st.Tick < 40 {
 		drawTextShadow(dst, "ВПЕРЁД!", 72, true, ScreenW/2, ScreenH/2-50, Center, withAlpha(colGold, 1-float64(s.st.Tick)/40))
@@ -289,9 +332,9 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	roundRect(dst, FieldX-3, 8, FieldW+6, 68, 12, rgba(26, 21, 30, 255))
 
 	// Слева: уровень и жизни.
-	title := "Шахта · ур. " + itoa(s.track.Level)
+	title := themes[s.track.World].short + " · ур. " + itoa(s.track.Level)
 	if s.track.Daily != "" {
-		title = "Испытание дня"
+		title = "День · " + themes[s.track.World].short
 	}
 	drawText(dst, title, 16, false, FieldX+14, 14, Left, colDim)
 	for i := 0; i < s.lv.Lives; i++ {
@@ -304,7 +347,7 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 
 	// Кристаллы.
 	x := FieldX + 190.0
-	drawCrystal(dst, x, 42, 0.7, float64(a.Frame))
+	drawItem(dst, s.track.World, x, 42, 0.7, float64(a.Frame), 0)
 	cc := colText
 	if st.ExitOpen {
 		cc = exitGlow
@@ -346,12 +389,13 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	drawText(dst, fmtScore(st.ItemScore), 30, true, 900, 30, Left, colText)
 
 	// Способности.
-	dashKey, shieldKey := "Space", "E"
+	dashKey, abKey := "Space", "E"
 	if a.Pointer.touchMode {
-		dashKey, shieldKey = "", ""
+		dashKey, abKey = "", ""
 	}
+	ab := s.lv.Rules().Ability
 	chip(dst, 1040, 42, "Рывок", dashKey, st.P.DashCD, sim.DashCooldown, rgba(255, 190, 90, 255))
-	chip(dst, 1160, 42, "Щит", shieldKey, st.P.AbilityCD, sim.ShieldCD, colAccent)
+	chip(dst, 1150, 42, sim.Abilities[ab].Name, abKey, st.P.AbilityCD, sim.Abilities[ab].Cooldown, abilityColor(ab))
 
 	// Призрак.
 	if s.ghost != nil {

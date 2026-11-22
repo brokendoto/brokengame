@@ -196,7 +196,7 @@ func (c *touchControls) update(p *pointer) sim.Input {
 	return in
 }
 
-func (c *touchControls) draw(dst *ebiten.Image, dashCD, shieldCD int) {
+func (c *touchControls) draw(dst *ebiten.Image, dashCD, abCD int, ab sim.Ability) {
 	white := rgba(255, 255, 255, 255)
 	if c.stickOn {
 		strokeCircle(dst, c.ox, c.oy, stickR, 3, withAlpha(white, 0.35))
@@ -220,10 +220,14 @@ func (c *touchControls) draw(dst *ebiten.Image, dashCD, shieldCD int) {
 		}
 		fillCircle(dst, x, y, r, withAlpha(c, a))
 		strokeCircle(dst, x, y, r, 3, withAlpha(white, 0.5))
-		drawText(dst, label, 18, true, x, y-11, Center, withAlpha(white, 0.9))
+		size := 18
+		if len([]rune(label)) > 6 {
+			size = 14
+		}
+		drawText(dst, label, size, true, x, y-float64(size)*0.6, Center, withAlpha(white, 0.9))
 	}
 	btn(dashBtnX, dashBtnY, dashBtnR, "Рывок", c.dashOn, dashCD, rgba(255, 170, 60, 255))
-	btn(shieldBtnX, shieldBtnY, shieldBtnR, "Щит", c.shieldOn, shieldCD, colAccent)
+	btn(shieldBtnX, shieldBtnY, shieldBtnR, sim.Abilities[ab].Name, c.shieldOn, abCD, abilityColor(ab))
 }
 
 // drawBackButton рисует кнопку «Назад» в углу и регистрирует зону нажатия.

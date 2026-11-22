@@ -21,7 +21,7 @@ const (
 	EvHit
 	EvBlock
 	EvDash
-	EvShield
+	EvAbility // N — какая способность
 	EvRockWarn
 	EvRockBreak
 	EvCaveWarn
@@ -29,6 +29,12 @@ const (
 	EvHeal
 	EvWin
 	EvLose
+	EvCursed  // взят проклятый предмет
+	EvGolden  // взят бонусный предмет
+	EvVanish  // бонусный предмет исчез
+	EvBlinkIn // призрак начинает телепорт
+	EvBlinkOut
+	EvHole // затянуло в чёрную дыру
 )
 
 // Event — событие шага.
@@ -48,7 +54,9 @@ type Player struct {
 	DashDY       float64
 	Invuln       int
 	ShieldT      int
+	MagnetT      int
 	AbilityCD    int
+	VX, VY       float64 // скорость (важна на льду)
 	prev         Input
 	Moving       bool
 	WalkDistance float64
@@ -61,6 +69,9 @@ type Chaser struct {
 	Spawn  int // >0 — ещё появляется
 	Stun   int
 	TX, TY int // клетка, к которой идёт
+	// Для призрака: таймер телепорта и куда он прыгнет.
+	BlinkT, BlinkWarn int
+	BX, BY            int
 }
 
 // Rock — катящийся валун.
@@ -83,11 +94,17 @@ type CaveIn struct {
 	Active     int
 }
 
-// Item — кристалл на поле.
+// Item — предмет на поле.
 type Item struct {
 	P     Pt
 	Taken bool
 }
+
+// GoldenLife — сколько шагов живёт бонусный предмет (первый; следующие дольше).
+const GoldenLife = 20 * TPS
+
+// Штраф за проклятый предмет.
+const CursedPenalty = 5 * TPS
 
 // State — изменяемое состояние партии.
 type State struct {
@@ -108,6 +125,11 @@ type State struct {
 	ItemScore  int
 	Hits       int
 	HeartTaken bool
+	Cursed     []Item
+	Golden     []Item
+	Penalty    int // штрафные шаги (проклятые предметы)
+	FreezeT    int // стоп-время
+	HazTick    int // часы ловушек (стоят во время стоп-времени)
 	Status     Status
 	LoseReason string
 	FinishTick int
@@ -129,11 +151,18 @@ func NewState(lv *Level) *State {
 	for _, p := range lv.Items {
 		s.Items = append(s.Items, Item{P: p})
 	}
+	for _, p := range lv.Cursed {
+		s.Cursed = append(s.Cursed, Item{P: p})
+	}
+	for _, p := range lv.Golden {
+		s.Golden = append(s.Golden, Item{P: p})
+	}
 	for i, c := range lv.Chasers {
 		s.Chasers = append(s.Chasers, Chaser{
 			X: float64(c.P.X) + 0.5, Y: float64(c.P.Y) + 0.5,
 			Kind: c.Kind, TX: c.P.X, TY: c.P.Y,
-			Spawn: 90 + i*45,
+			Spawn:  90 + i*45,
+			BlinkT: 240 + i*70,
 		})
 	}
 	if lv.Cfg.RockEvery > 0 {
@@ -147,12 +176,18 @@ func NewState(lv *Level) *State {
 
 // TimeLeft — сколько шагов осталось до конца времени.
 func (s *State) TimeLeft() int {
-	t := s.Lv.TimeLimit - s.Tick
+	t := s.Lv.TimeLimit - s.Elapsed()
 	if t < 0 {
 		return 0
 	}
 	return t
 }
+
+// Elapsed — прошедшее время с учётом штрафов.
+func (s *State) Elapsed() int { return s.Tick + s.Penalty }
+
+// GoldenLeft — сколько шагов осталось жить i-му бонусному предмету.
+func (s *State) GoldenLeft(i int) int { return GoldenLife + i*5*TPS - s.Tick }
 
 // Multiplier — множитель очков текущей серии.
 func (s *State) Multiplier() float64 { return comboMul(s.Combo) }
@@ -187,17 +222,26 @@ func (s *State) Step(in Input) {
 	if s.hasCunning() {
 		s.Lv.BFS(s.aheadTarget(), &s.distAhead)
 	}
-	s.updateChasers()
-	s.updateRocks()
-	s.updateCaves()
-	s.updateSpikes()
+	s.updateHoles()
+	if s.Status != Playing {
+		return
+	}
+	if s.FreezeT > 0 {
+		s.FreezeT--
+	} else {
+		s.HazTick++
+		s.updateChasers()
+		s.updateRocks()
+		s.updateCaves()
+		s.updateSpikes()
+	}
 	if s.ComboTimer > 0 {
 		s.ComboTimer--
 		if s.ComboTimer == 0 {
 			s.Combo = 0
 		}
 	}
-	if s.Status == Playing && s.Tick >= s.Lv.TimeLimit {
+	if s.Status == Playing && s.Elapsed() >= s.Lv.TimeLimit {
 		s.lose("Время вышло")
 	}
 }
@@ -205,7 +249,7 @@ func (s *State) Step(in Input) {
 func (s *State) lose(reason string) {
 	s.Status = Lost
 	s.LoseReason = reason
-	s.FinishTick = s.Tick
+	s.FinishTick = s.Elapsed()
 	s.emit(EvLose, s.P.X, s.P.Y, 0)
 }
 
@@ -237,6 +281,11 @@ func (s *State) updatePlayer(in Input) {
 	pressed := in &^ p.prev
 	p.prev = in
 	dx, dy := inputDir(in)
+	cell := s.Lv.CellAt(int(p.X), int(p.Y))
+	if cell == Fog {
+		// Туман: управление наоборот.
+		dx, dy = -dx, -dy
+	}
 	if dx != 0 || dy != 0 {
 		p.FX, p.FY = dx, dy
 	}
@@ -247,23 +296,39 @@ func (s *State) updatePlayer(in Input) {
 		s.emit(EvDash, p.X, p.Y, 0)
 	}
 	if pressed&InAbility != 0 && p.AbilityCD == 0 {
-		p.ShieldT, p.AbilityCD = ShieldTicks, ShieldCD
-		s.emit(EvShield, p.X, p.Y, 0)
+		s.useAbility()
 	}
 
 	var vx, vy float64
 	if p.DashT > 0 {
 		vx, vy = p.DashDX*DashSpeed, p.DashDY*DashSpeed
 		p.DashT--
+		if p.DashT == 0 {
+			vx, vy = p.DashDX*PlayerSpeed, p.DashDY*PlayerSpeed
+		}
 	} else {
 		sp := PlayerSpeed
-		if s.Lv.CellAt(int(p.X), int(p.Y)) == Mud {
+		if cell == Mud {
 			sp *= MudFactor
 		}
 		vx, vy = dx*sp, dy*sp
+		if cell == Ice {
+			// Лёд/невесомость: скорость меняется плавно, героя заносит.
+			vx = p.VX + (vx-p.VX)*IceGrip
+			vy = p.VY + (vy-p.VY)*IceGrip
+		}
 	}
+	p.VX, p.VY = vx, vy
+	px, py := s.holePull()
 	ox, oy := p.X, p.Y
-	s.movePlayer(vx/TPS, vy/TPS)
+	s.movePlayer(vx/TPS+px, vy/TPS+py)
+	// Упёрся в стену — эта составляющая скорости гасится.
+	if math.Abs(p.X-ox) < math.Abs(vx/TPS)*0.5 {
+		p.VX = 0
+	}
+	if math.Abs(p.Y-oy) < math.Abs(vy/TPS)*0.5 {
+		p.VY = 0
+	}
 	moved := math.Hypot(p.X-ox, p.Y-oy)
 	p.Moving = moved > 1e-4
 	p.WalkDistance += moved
@@ -276,6 +341,9 @@ func (s *State) updatePlayer(in Input) {
 	}
 	if p.ShieldT > 0 {
 		p.ShieldT--
+	}
+	if p.MagnetT > 0 {
+		p.MagnetT--
 	}
 	if p.Invuln > 0 {
 		p.Invuln--
@@ -392,13 +460,48 @@ func (s *State) hurt(reason string) (blocked bool) {
 
 func (s *State) updatePickups() {
 	p := &s.P
+	radius := PickupRadius
+	if p.MagnetT > 0 {
+		radius = MagnetRadius
+	}
+	for i := range s.Cursed {
+		it := &s.Cursed[i]
+		if !it.Taken && math.Hypot(p.X-float64(it.P.X)-0.5, p.Y-float64(it.P.Y)-0.5) < PickupRadius {
+			it.Taken = true
+			s.Penalty += CursedPenalty
+			s.Combo, s.ComboTimer = 0, 0
+			s.emit(EvCursed, float64(it.P.X)+0.5, float64(it.P.Y)+0.5, 0)
+		}
+	}
+	for i := range s.Golden {
+		it := &s.Golden[i]
+		if it.Taken {
+			continue
+		}
+		gx, gy := float64(it.P.X)+0.5, float64(it.P.Y)+0.5
+		if s.GoldenLeft(i) <= 0 {
+			it.Taken = true
+			s.emit(EvVanish, gx, gy, 0)
+			continue
+		}
+		if math.Hypot(p.X-gx, p.Y-gy) < radius {
+			it.Taken = true
+			s.Combo++
+			s.ComboTimer = ComboWindow
+			if s.Combo > s.BestCombo {
+				s.BestCombo = s.Combo
+			}
+			s.ItemScore += int(GoldenScore * comboMul(s.Combo))
+			s.emit(EvGolden, gx, gy, s.Combo)
+		}
+	}
 	for i := range s.Items {
 		it := &s.Items[i]
 		if it.Taken {
 			continue
 		}
 		ix, iy := float64(it.P.X)+0.5, float64(it.P.Y)+0.5
-		if math.Hypot(p.X-ix, p.Y-iy) < PickupRadius {
+		if math.Hypot(p.X-ix, p.Y-iy) < radius {
 			it.Taken = true
 			s.Collected++
 			s.Combo++
@@ -430,7 +533,7 @@ func (s *State) updatePickups() {
 		ex, ey := float64(s.Lv.Exit.X)+0.5, float64(s.Lv.Exit.Y)+0.5
 		if math.Hypot(p.X-ex, p.Y-ey) < 0.5 {
 			s.Status = Won
-			s.FinishTick = s.Tick
+			s.FinishTick = s.Elapsed()
 			s.emit(EvWin, ex, ey, 0)
 		}
 	}
@@ -472,8 +575,16 @@ func (s *State) updateChasers() {
 			continue
 		}
 		speed := s.Lv.Cfg.EnemySpeed
-		if c.Kind == ChaserCunning {
+		switch c.Kind {
+		case ChaserCunning:
 			speed *= 0.92
+		case ChaserZigzag:
+			speed *= 1.2
+		case ChaserPhantom:
+			speed *= 0.8
+			if s.updatePhantom(c) {
+				continue
+			}
 		}
 		if s.Lv.CellAt(int(c.X), int(c.Y)) == Mud {
 			speed *= 0.7
@@ -499,7 +610,7 @@ func (s *State) updateChasers() {
 		}
 
 		if math.Hypot(s.P.X-c.X, s.P.Y-c.Y) < PlayerRadius+ChaserRadius {
-			if s.hurt("Тебя догнал жук") {
+			if s.hurt(s.Lv.Rules().ChaserHit) {
 				c.Stun = 90
 			} else if s.P.Invuln == InvulnTicks {
 				c.Stun = 45
@@ -533,6 +644,13 @@ func (s *State) stepChaser(c *Chaser, idx int, step float64, field *DistField) {
 			f := field[y][x]
 			if f >= 0 && (best < 0 || f < best) {
 				best, nx, ny = f, x, y
+			}
+		}
+		if c.Kind == ChaserZigzag && s.RNG.Intn(100) < 40 {
+			// Зигзаг: на развилке иногда сворачивает в случайную сторону.
+			dv := dirs[s.RNG.Intn(4)]
+			if x, y := c.TX+dv.X, c.TY+dv.Y; !s.Lv.Solid(x, y) {
+				nx, ny = x, y
 			}
 		}
 		if nx == c.TX && ny == c.TY {
@@ -570,7 +688,7 @@ func (s *State) updateRocks() {
 				r.Dead = true
 			}
 			if !r.Dead && math.Hypot(s.P.X-r.X, s.P.Y-r.Y) < PlayerRadius+RockRadius {
-				s.hurt("Под валуном")
+				s.hurt(s.Lv.Rules().RockHit)
 			}
 		}
 		if !r.Dead {
@@ -650,7 +768,7 @@ func (s *State) updateCaves() {
 				d = math.Abs(s.P.X - (float64(c.Line) + 0.5))
 			}
 			if d < 0.5+PlayerRadius*0.5 {
-				s.hurt("Завалило породой")
+				s.hurt(s.Lv.Rules().BeamHit)
 			}
 		}
 		if c.Warn > 0 || c.Active > 0 {
@@ -663,13 +781,13 @@ func (s *State) updateCaves() {
 // --- шипы -------------------------------------------------------------------
 
 // SpikePhase возвращает фазу шипов на текущем шаге.
-func (s *State) SpikePhase(t SpikeTrap) int { return (s.Tick + t.Phase) % SpikePeriod }
+func (s *State) SpikePhase(t SpikeTrap) int { return (s.HazTick + t.Phase) % SpikePeriod }
 
 func (s *State) updateSpikes() {
 	pc := Pt{int(s.P.X), int(s.P.Y)}
 	for _, t := range s.Lv.Spikes {
 		if t.P == pc && s.SpikePhase(t) >= SpikeUpFrom {
-			s.hurt("Напоролся на шипы")
+			s.hurt(s.Lv.Rules().SpikeHit)
 		}
 	}
 }
@@ -682,4 +800,117 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// --- способности ---------------------------------------------------------------
+
+func (s *State) useAbility() {
+	p := &s.P
+	ab := s.Lv.Rules().Ability
+	info := Abilities[ab]
+	p.AbilityCD = info.Cooldown
+	switch ab {
+	case AbShield:
+		p.ShieldT = info.Duration
+	case AbMagnet:
+		p.MagnetT = info.Duration
+	case AbTimeStop:
+		s.FreezeT = info.Duration
+	case AbBlink:
+		// Самая дальняя свободная точка на 3 клетки вперёд (стены не мешают).
+		for k := BlinkDistance; k >= 0.5; k -= 0.25 {
+			x, y := p.X+p.FX*k, p.Y+p.FY*k
+			if !s.blocked(x, y) && x > 0 && y > 0 && x < W && y < H {
+				s.emit(EvBlinkOut, p.X, p.Y, 0)
+				p.X, p.Y = x, y
+				p.Invuln = max(p.Invuln, 12)
+				break
+			}
+		}
+	case AbPulse:
+		for i := range s.Chasers {
+			c := &s.Chasers[i]
+			if c.Spawn == 0 && math.Hypot(c.X-p.X, c.Y-p.Y) < PulseRadius {
+				c.Stun = 150
+				c.BlinkWarn = 0
+			}
+		}
+		for i := range s.Rocks {
+			r := &s.Rocks[i]
+			if r.Warn == 0 && math.Hypot(r.X-p.X, r.Y-p.Y) < PulseRadius {
+				r.Dead = true
+				s.emit(EvRockBreak, r.X, r.Y, 0)
+			}
+		}
+	}
+	s.emit(EvAbility, p.X, p.Y, int(ab))
+}
+
+// --- призрак (телепорт за спину) ------------------------------------------------
+
+// updatePhantom ведёт таймер телепорта. Возвращает true, если в этот шаг
+// призрак не двигается обычным образом (готовится к прыжку).
+func (s *State) updatePhantom(c *Chaser) bool {
+	if c.BlinkWarn > 0 {
+		c.BlinkWarn--
+		if c.BlinkWarn == 0 {
+			s.emit(EvBlinkOut, c.X, c.Y, 0)
+			c.X, c.Y = float64(c.BX)+0.5, float64(c.BY)+0.5
+			c.TX, c.TY = c.BX, c.BY
+			c.Stun = 20 // короткая пауза после прыжка — шанс увернуться
+			s.emit(EvBlinkIn, c.X, c.Y, 0)
+		}
+		return true
+	}
+	c.BlinkT--
+	if c.BlinkT > 0 {
+		return false
+	}
+	c.BlinkT = PhantomEvery
+	// Клетка в 2–3 шагах позади игрока.
+	for k := 3.0; k >= 2; k-- {
+		x, y := int(s.P.X-s.P.FX*k), int(s.P.Y-s.P.FY*k)
+		if !s.Lv.Solid(x, y) && s.distP[y][x] >= 0 {
+			c.BX, c.BY = x, y
+			c.BlinkWarn = PhantomWarn
+			s.emit(EvBlinkIn, float64(x)+0.5, float64(y)+0.5, 1)
+			return true
+		}
+	}
+	return false
+}
+
+// --- чёрные дыры ---------------------------------------------------------------
+
+// holePull — смещение игрока за шаг от притяжения чёрных дыр.
+func (s *State) holePull() (float64, float64) {
+	var fx, fy float64
+	for _, h := range s.Lv.Holes {
+		dx, dy := float64(h.X)+0.5-s.P.X, float64(h.Y)+0.5-s.P.Y
+		d := math.Hypot(dx, dy)
+		if d < HoleRadius && d > 1e-6 {
+			f := HolePull * (1 - d/HoleRadius) / TPS
+			fx += dx / d * f
+			fy += dy / d * f
+		}
+	}
+	return fx, fy
+}
+
+func (s *State) updateHoles() {
+	p := &s.P
+	for _, h := range s.Lv.Holes {
+		hx, hy := float64(h.X)+0.5, float64(h.Y)+0.5
+		if math.Hypot(p.X-hx, p.Y-hy) < HoleCore && p.Invuln == 0 && p.DashT == 0 {
+			// Щит от чёрной дыры не спасает: героя выбрасывает на старт.
+			saved := p.ShieldT
+			p.ShieldT = 0
+			s.hurt("Затянуло в чёрную дыру")
+			p.ShieldT = saved
+			s.emit(EvHole, hx, hy, 0)
+			p.X, p.Y = float64(s.Lv.Start.X)+0.5, float64(s.Lv.Start.Y)+0.5
+			p.VX, p.VY = 0, 0
+			return
+		}
+	}
 }
