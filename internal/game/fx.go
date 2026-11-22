@@ -97,8 +97,11 @@ func (f *fxSystem) update() {
 	f.flash *= 0.9
 }
 
+// screenShake — включены ли тряска экрана и красные вспышки (настройка).
+var screenShake = true
+
 func (f *fxSystem) offset() (float64, float64) {
-	if f.shake == 0 {
+	if f.shake == 0 || !screenShake {
 		return 0, 0
 	}
 	return (f.rng.Float() - 0.5) * f.shake, (f.rng.Float() - 0.5) * f.shake

@@ -46,11 +46,13 @@ type Bank struct {
 	ctx   *audio.Context
 	data  [kindCount][]byte
 	Muted bool
+	// Volume — громкость от 0 до 1.
+	Volume float64
 }
 
 // NewBank синтезирует все звуки.
 func NewBank() *Bank {
-	b := &Bank{ctx: audio.NewContext(sampleRate)}
+	b := &Bank{ctx: audio.NewContext(sampleRate), Volume: 0.8}
 	for i := 0; i < 10; i++ {
 		f := 660 * math.Pow(2, float64(i)/12*2) // каждая серия — на тон выше
 		b.data[Pickup+Kind(i)] = render(0.16, func(t float64) float64 {
@@ -114,10 +116,11 @@ func NewBank() *Bank {
 
 // Play проигрывает звук.
 func (b *Bank) Play(k Kind) {
-	if b == nil || b.Muted || k < 0 || k >= kindCount || b.data[k] == nil {
+	if b == nil || b.Muted || b.Volume <= 0 || k < 0 || k >= kindCount || b.data[k] == nil {
 		return
 	}
 	p := b.ctx.NewPlayerFromBytes(b.data[k])
+	p.SetVolume(b.Volume)
 	p.Play()
 }
 

@@ -13,7 +13,11 @@ type Profile struct {
 	Muted      bool           `json:"muted"`
 	Fullscreen bool           `json:"fullscreen"`
 	ShowGhost  bool           `json:"show_ghost"`
-	World      sim.World      `json:"world"` // последний выбранный мир
+	World      sim.World      `json:"world"`  // последний выбранный мир
+	Volume     int            `json:"volume"` // громкость 0..100
+	Shake      bool           `json:"shake"`  // тряска экрана и вспышки
+	// Keys — переназначенные клавиши: "solo.dash" → ["Space", "ShiftLeft"].
+	Keys map[string][]string `json:"keys,omitempty"`
 	// Unlocked: "mine-normal" → номер последнего открытого уровня.
 	Unlocked map[string]int `json:"unlocked"`
 	// Medals: ключ трассы → лучшая медаль.
@@ -24,7 +28,7 @@ type Profile struct {
 
 // LoadProfile читает профиль из папки dir (или создаёт новый).
 func LoadProfile(dir string) *Profile {
-	p := &Profile{Diff: sim.Normal, ShowGhost: true}
+	p := &Profile{Diff: sim.Normal, ShowGhost: true, Volume: 80, Shake: true}
 	if dir != "" {
 		p.path = filepath.Join(dir, "profile.json")
 	}
@@ -34,6 +38,9 @@ func LoadProfile(dir string) *Profile {
 	}
 	if p.Medals == nil {
 		p.Medals = map[string]sim.Medal{}
+	}
+	if p.Volume < 0 || p.Volume > 100 {
+		p.Volume = 80
 	}
 	if p.Diff < 0 || p.Diff >= sim.DifficultyCount {
 		p.Diff = sim.Normal

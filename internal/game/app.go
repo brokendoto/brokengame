@@ -59,6 +59,7 @@ func New() *App {
 	}
 	a.Records = a.Rec
 	a.Sound.Muted = a.Prof.Muted
+	a.applySettings()
 	r := sim.NewRNG(uint64(time.Now().UnixNano()))
 	for i := 0; i < 70; i++ {
 		a.bgDust = append(a.bgDust, dust{
