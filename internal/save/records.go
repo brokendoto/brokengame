@@ -19,8 +19,9 @@ type Entry struct {
 	Ticks  int    `json:"ticks"`
 	Medal  int    `json:"medal"`
 	Date   string `json:"date"`
-	Sim    int    `json:"sim"`    // версия правил, на которой поставлен рекорд
-	Replay string `json:"replay"` // запись нажатий (для призрака и проверки)
+	Sim    int    `json:"sim"`              // версия правил, на которой поставлен рекорд
+	Replay string `json:"replay"`           // запись нажатий (для призрака и проверки)
+	Stages int    `json:"stages,omitempty"` // марафон: сколько этапов пройдено
 }
 
 // Better — лучше ли запись a, чем b: больше очков, при равенстве быстрее.

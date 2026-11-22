@@ -252,7 +252,11 @@ func drawLeaderboard(dst *ebiten.Image, top []save.Entry, x, y, w float64, me st
 			c = []rgbaT{colGold, colSilver, colBronze}[i]
 		}
 		drawText(dst, itoa(i+1), 20, true, x+10, ry, Left, c)
-		drawMedal(dst, x+w-205, ry+11, 7, sim.Medal(e.Medal))
+		if e.Stages > 0 {
+			drawText(dst, itoa(e.Stages)+" эт.", 15, false, x+w-205, ry+3, Center, colAccent)
+		} else {
+			drawMedal(dst, x+w-205, ry+11, 7, sim.Medal(e.Medal))
+		}
 		name := e.Name
 		if len([]rune(name)) > 14 {
 			name = string([]rune(name)[:14]) + "…"

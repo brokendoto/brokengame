@@ -100,3 +100,14 @@ func TestSteamAPINames(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckMarathon(t *testing.T) {
+	if len(CheckMarathon(4)) != 0 || !has(CheckMarathon(5), Marathon5) || has(CheckMarathon(14), Marathon15) || !has(CheckMarathon(15), Marathon15) {
+		t.Fatal("пороги марафона")
+	}
+	// Восьмой уровень на сложной в марафоне — не «Хардкор»: это не уровень кампании.
+	r := Run{Track: sim.MarathonTrack("2026-W47", 20), Result: sim.Result{Won: true}}
+	if has(CheckRun(r), HardFinale) {
+		t.Fatal("марафон не должен давать «Хардкор»")
+	}
+}
