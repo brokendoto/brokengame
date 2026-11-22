@@ -1,6 +1,10 @@
 package save
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/brokendoto/brokengame/internal/sim"
+)
 
 func TestSubmitRanking(t *testing.T) {
 	r := LoadRecords(t.TempDir())
@@ -33,5 +37,26 @@ func TestTopSizeLimit(t *testing.T) {
 	}
 	if n := len(r.Top("x")); n != TopSize {
 		t.Fatalf("строк %d", n)
+	}
+}
+
+func TestWorldUnlock(t *testing.T) {
+	p := LoadProfile("")
+	if !p.WorldOpen(sim.Mine) || p.WorldOpen(sim.Forest) {
+		t.Fatal("в начале открыта только шахта")
+	}
+	for lvl := 1; lvl <= LevelsToUnlockWorld; lvl++ {
+		if p.WorldOpen(sim.Forest) {
+			t.Fatalf("лес открылся слишком рано, после %d уровней", lvl-1)
+		}
+		p.Complete(sim.Track{World: sim.Mine, Level: lvl, Diff: sim.Hard}, sim.Bronze)
+	}
+	if !p.WorldOpen(sim.Forest) || p.WorldOpen(sim.Temple) {
+		t.Fatal("после 4 уровней шахты должен открыться лес, но не храм")
+	}
+	// Испытание дня прогресс кампании не двигает.
+	p.Complete(sim.DailyTrack("2026-11-23"), sim.Gold)
+	if p.WorldOpen(sim.Temple) {
+		t.Fatal("испытание дня не открывает миры")
 	}
 }

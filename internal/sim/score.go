@@ -54,7 +54,7 @@ func Run(lv *Level, inputs []Input) Result {
 // Autopilot — простой бот: идёт к ближайшему кристаллу по кратчайшему пути,
 // потом к выходу. Опасностей не избегает. Нужен для тестов (проверка, что
 // уровни проходимы) и для фона главного меню.
-func Autopilot(s *State) Input {
+func Autopilot(s *State) (in Input) {
 	var target Pt
 	var d DistField
 	cur := Pt{int(s.P.X), int(s.P.Y)}
@@ -81,7 +81,12 @@ func Autopilot(s *State) Input {
 		}
 	}
 	tx, ty := float64(next.X)+0.5, float64(next.Y)+0.5
-	var in Input
+	defer func() {
+		// В тумане управление наоборот — бот это знает.
+		if s.Lv.CellAt(int(s.P.X), int(s.P.Y)) == Fog {
+			in = in&^(InUp|InDown|InLeft|InRight) | flipDirs(in)
+		}
+	}()
 	const eps = 0.06
 	dx, dy := tx-s.P.X, ty-s.P.Y
 	// Сначала выравниваемся по оси, перпендикулярной движению, чтобы не цеплять углы.
@@ -101,4 +106,21 @@ func Autopilot(s *State) Input {
 		in |= InUp
 	}
 	return in
+}
+
+func flipDirs(in Input) Input {
+	var out Input
+	if in&InUp != 0 {
+		out |= InDown
+	}
+	if in&InDown != 0 {
+		out |= InUp
+	}
+	if in&InLeft != 0 {
+		out |= InRight
+	}
+	if in&InRight != 0 {
+		out |= InLeft
+	}
+	return out
 }

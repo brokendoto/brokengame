@@ -2,7 +2,9 @@ name: build
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   windows:
@@ -22,3 +24,95 @@ jobs:
         with:
           name: Pyatimirye-windows
           path: dist/Pyatimirye.exe
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Системные библиотеки
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev
+      - name: Тесты
+        run: go test ./...
+      - name: Сборка
+        run: go build -trimpath -ldflags "-s -w" -o dist/pyatimirye ./cmd/pyatimirye
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-linux
+          path: dist/pyatimirye
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Сборка
+        run: go build -trimpath -ldflags "-s -w" -o dist/pyatimirye ./cmd/pyatimirye
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-macos
+          path: dist/pyatimirye
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Сборка WebAssembly
+        run: |
+          mkdir -p dist/web
+          GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o dist/web/game.wasm ./cmd/pyatimirye
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/web/
+          cp scripts/index.html dist/web/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-web
+          path: dist/web
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Библиотека игры (.aar)
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          go tool ebitenmobile bind -target android -androidapi 23 \
+            -javapkg com.brokendoto.pyatimirye \
+            -o android/app/libs/pyatimirye.aar ./mobile
+      - name: Сборка APK
+        working-directory: android
+        run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Фреймворк игры для iOS
+        run: go tool ebitenmobile bind -target ios -o dist/Pyatimirye.xcframework ./mobile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-ios-xcframework
+          path: dist/Pyatimirye.xcframework
