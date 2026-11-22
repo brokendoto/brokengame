@@ -114,6 +114,9 @@ func NewBank() *Bank {
 	return b
 }
 
+// Context — звуковой контекст (через него играет и музыка).
+func (b *Bank) Context() *audio.Context { return b.ctx }
+
 // Play проигрывает звук.
 func (b *Bank) Play(k Kind) {
 	if b == nil || b.Muted || b.Volume <= 0 || k < 0 || k >= kindCount || b.data[k] == nil {

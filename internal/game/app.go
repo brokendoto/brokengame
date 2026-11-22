@@ -30,6 +30,7 @@ type App struct {
 	Records save.Leaderboard
 	Rec     *save.Records
 	Sound   *sfx.Bank
+	Music   *musicPlayer
 	Frame   int
 	Pointer *pointer
 
@@ -64,6 +65,8 @@ func New() *App {
 	}
 	a.Records = a.Rec
 	a.Sound.Muted = a.Prof.Muted
+	a.Music = newMusicPlayer(a.Sound.Context())
+	a.Music.data("menu") // меню готовим заранее, пока грузится остальное
 	a.applySettings()
 	r := sim.NewRNG(uint64(time.Now().UnixNano()))
 	for i := 0; i < 70; i++ {
@@ -131,6 +134,15 @@ func (a *App) Update() error {
 	if a.toastT > 0 {
 		a.toastT--
 	}
+	cur := a.scene
+	if a.next != nil {
+		cur = a.next
+	}
+	vol := a.Sound.Volume * float64(a.Prof.Music) / 100
+	if a.Sound.Muted {
+		vol = 0
+	}
+	a.Music.update(musicFor(cur), vol)
 	if len(a.achQueue) > 0 {
 		a.achT++
 		if a.achT > achShowTicks {
