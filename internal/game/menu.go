@@ -20,6 +20,7 @@ type menuItem int
 const (
 	miCampaign menuItem = iota
 	miDaily
+	miDuel
 	miRecords
 	miDiff
 	miPlayer
@@ -38,7 +39,7 @@ type menuScene struct {
 }
 
 func newMenuScene() *menuScene {
-	m := &menuScene{items: []menuItem{miCampaign, miDaily, miRecords, miDiff, miPlayer, miGhost, miSound}}
+	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miDiff, miPlayer, miGhost, miSound}}
 	if !IsMobile() {
 		m.items = append(m.items, miFullscreen)
 	}
@@ -60,6 +61,8 @@ func (m *menuScene) label(a *App, it menuItem) string {
 		return "Играть: " + sim.Worlds[a.Prof.World].Name
 	case miDaily:
 		return "Испытание дня"
+	case miDuel:
+		return "Дуэль вдвоём"
 	case miRecords:
 		return "Таблицы рекордов"
 	case miDiff:
@@ -120,6 +123,8 @@ func (m *menuScene) Update(a *App) {
 		a.Goto(newLevelScene(a))
 	case miDaily:
 		a.Goto(newPlayScene(a, sim.DailyTrack(today())))
+	case miDuel:
+		a.Goto(newDuelSetupScene(a))
 	case miRecords:
 		a.Goto(newRecordsScene(a))
 	case miDiff:
@@ -168,7 +173,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 		if sel {
 			c = colText
 		}
-		if it == miCampaign || it == miDaily {
+		if it == miCampaign || it == miDaily || it == miDuel {
 			if !sel {
 				c = colAccent
 			}
@@ -190,7 +195,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	} else {
 		keyHint(dst, "↑↓ — выбор   ·   Enter — ок   ·   ←→ — сложность   ·   F11 — полный экран   ·   M — звук")
 	}
-	drawText(dst, "v0.3 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
+	drawText(dst, "v0.4 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
 }
 
 // --- Выбор уровня ------------------------------------------------------------

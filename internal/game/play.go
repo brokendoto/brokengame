@@ -146,88 +146,109 @@ func (s *playScene) Update(a *App) {
 }
 
 func (s *playScene) handleEvents(a *App) {
-	for _, e := range s.st.Events {
+	eventFX(a, s.fx, s.track.World, s.st.Events, false, func(t string) { s.banner, s.bannerT = t, 120 })
+}
+
+// eventFX превращает события симуляции в звук, частицы и надписи.
+// duel — подписи очков цветом игрока и события дуэли.
+func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, banner func(string)) {
+	for _, e := range events {
 		x, y := px(e.X), py(e.Y)
 		switch e.Kind {
 		case sim.EvPickup:
 			a.Sound.PlayPickup(e.N)
-			s.fx.burst(x, y, 16, themes[s.track.World].itemGlow, 5, 3, true)
+			fx.burst(x, y, 16, themes[w].itemGlow, 5, 3, true)
 			pts := int(100 * (1 + 0.25*float64(min(e.N, 9)-1)))
 			c := colText
 			if e.N >= 3 {
 				c = colGold
 			}
-			s.fx.text("+"+itoa(pts), x, y-30, c, 20)
+			if duel {
+				c = duelColors[e.P]
+			}
+			fx.text("+"+itoa(pts), x, y-30, c, 20)
 		case sim.EvExitOpen:
 			a.Sound.Play(sfx.ExitOpen)
-			s.fx.burst(x, y, 40, exitGlow, 7, 4, true)
-			s.banner, s.bannerT = "Все "+sim.Worlds[s.track.World].ItemsPl+" собраны — к выходу!", 120
+			fx.burst(x, y, 40, exitGlow, 7, 4, true)
+			banner("Все " + sim.Worlds[w].ItemsPl + " собраны — к выходу!")
 		case sim.EvHit:
 			a.Sound.Play(sfx.Hit)
-			s.fx.shake, s.fx.flash = 14, 1
-			s.fx.burst(x, y, 20, colRed, 6, 4, false)
+			fx.shake, fx.flash = 14, 1
+			fx.burst(x, y, 20, colRed, 6, 4, false)
 		case sim.EvBlock:
 			a.Sound.Play(sfx.Block)
-			s.fx.burst(x, y, 14, colAccent, 6, 3, true)
+			fx.burst(x, y, 14, colAccent, 6, 3, true)
 		case sim.EvDash:
 			a.Sound.Play(sfx.Dash)
-			s.fx.debris(x, y+10, 6, themes[s.track.World].speck)
+			fx.debris(x, y+10, 6, themes[w].speck)
 		case sim.EvAbility:
 			ab := sim.Ability(e.N)
 			c := abilityColor(ab)
 			switch ab {
 			case sim.AbBlink:
 				a.Sound.Play(sfx.Dash)
-				s.fx.burst(x, y, 24, c, 5, 3, true)
+				fx.burst(x, y, 24, c, 5, 3, true)
 			case sim.AbPulse:
 				a.Sound.Play(sfx.Crash)
-				s.fx.shake = math.Max(s.fx.shake, 5)
+				fx.shake = math.Max(fx.shake, 5)
 				for i := 0; i < 3; i++ {
-					s.fx.burst(x, y, 24, c, 8+float64(i)*3, 3, true)
+					fx.burst(x, y, 24, c, 8+float64(i)*3, 3, true)
 				}
 			default:
 				a.Sound.Play(sfx.Shield)
-				s.fx.burst(x, y, 20, c, 4, 3, true)
+				fx.burst(x, y, 20, c, 4, 3, true)
 			}
 		case sim.EvBlinkOut:
-			s.fx.burst(x, y, 14, themes[s.track.World].eyeSpecial, 4, 3, true)
+			fx.burst(x, y, 14, themes[w].eyeSpecial, 4, 3, true)
 		case sim.EvBlinkIn:
 			if e.N == 1 {
 				a.Sound.Play(sfx.Warn)
 			} else {
-				s.fx.burst(x, y, 14, themes[s.track.World].eyeSpecial, 4, 3, true)
+				fx.burst(x, y, 14, themes[w].eyeSpecial, 4, 3, true)
 			}
 		case sim.EvCursed:
 			a.Sound.Play(sfx.Hit)
-			s.fx.burst(x, y, 18, rgba(255, 60, 140, 255), 5, 3, true)
-			s.fx.text("−5 с", x, y-30, colRed, 24)
-			s.fx.shake = math.Max(s.fx.shake, 5)
+			fx.burst(x, y, 18, rgba(255, 60, 140, 255), 5, 3, true)
+			fx.text("−5 с", x, y-30, colRed, 24)
+			fx.shake = math.Max(fx.shake, 5)
 		case sim.EvGolden:
 			a.Sound.PlayPickup(e.N + 2)
-			s.fx.burst(x, y, 24, colGold, 6, 3, true)
+			fx.burst(x, y, 24, colGold, 6, 3, true)
 			pts := int(sim.GoldenScore * (1 + 0.25*float64(min(e.N, 9)-1)))
-			s.fx.text("+"+itoa(pts), x, y-30, colGold, 24)
+			fx.text("+"+itoa(pts), x, y-30, colGold, 24)
 		case sim.EvVanish:
-			s.fx.burst(x, y, 10, withAlpha(colGold, 0.6), 3, 2, true)
+			fx.burst(x, y, 10, withAlpha(colGold, 0.6), 3, 2, true)
 		case sim.EvHole:
-			s.fx.burst(x, y, 30, rgba(170, 90, 255, 255), 6, 4, true)
+			fx.burst(x, y, 30, rgba(170, 90, 255, 255), 6, 4, true)
 		case sim.EvRockWarn, sim.EvCaveWarn:
 			a.Sound.Play(sfx.Warn)
 		case sim.EvRockBreak:
 			a.Sound.Play(sfx.Crash)
-			s.fx.debris(x, y, 14, rgba(138, 128, 120, 255))
-			s.fx.shake = math.Max(s.fx.shake, 4)
+			fx.debris(x, y, 14, rgba(138, 128, 120, 255))
+			fx.shake = math.Max(fx.shake, 4)
 		case sim.EvCaveFall:
 			a.Sound.Play(sfx.Crash)
-			s.fx.shake = math.Max(s.fx.shake, 9)
+			fx.shake = math.Max(fx.shake, 9)
 		case sim.EvHeal:
 			a.Sound.Play(sfx.Heal)
-			s.fx.burst(x, y, 16, rgba(255, 110, 130, 255), 4, 3, true)
+			fx.burst(x, y, 16, rgba(255, 110, 130, 255), 4, 3, true)
 		case sim.EvWin:
 			a.Sound.Play(sfx.Win)
-			s.fx.burst(x, y, 60, exitGlow, 9, 4, true)
+			fx.burst(x, y, 60, exitGlow, 9, 4, true)
 		case sim.EvLose:
 			a.Sound.Play(sfx.Lose)
+		case sim.EvKnockout:
+			a.Sound.Play(sfx.Lose)
+			fx.burst(x, y, 40, duelColors[e.N], 7, 4, true)
+			banner("Игрок " + itoa(e.N+1) + " выбит! −" + itoa(sim.DuelKnockPenalty))
+		case sim.EvRespawn:
+			a.Sound.Play(sfx.Heal)
+			fx.burst(x, y, 20, duelColors[e.N], 4, 3, true)
+		case sim.EvStun:
+			a.Sound.Play(sfx.Block)
+			fx.shake = math.Max(fx.shake, 6)
+			fx.burst(x, y, 18, rgba(255, 240, 120, 255), 5, 3, true)
+			fx.text("Оглушён!", x, y-34, duelColors[e.N], 20)
 		}
 	}
 }
