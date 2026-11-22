@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"github.com/brokendoto/brokengame/internal/achieve"
+	"github.com/brokendoto/brokengame/internal/platform"
 	"github.com/brokendoto/brokengame/internal/sfx"
 )
 
@@ -18,6 +19,9 @@ func (a *App) Grant(ids ...achieve.ID) {
 		return
 	}
 	_ = a.Prof.Save()
+	for _, id := range fresh {
+		platform.Current.Unlock(string(id))
+	}
 	if len(a.achQueue) == 0 {
 		a.achT = 0
 		a.Sound.Play(sfx.Win)

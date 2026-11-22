@@ -12,6 +12,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/brokendoto/brokengame/internal/achieve"
+	"github.com/brokendoto/brokengame/internal/platform"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
@@ -72,6 +73,17 @@ func New() *App {
 			r: 1 + r.Float()*2.5, phase: r.Float() * 6.28,
 		})
 	}
+	// В Steam имя игрока берётся из профиля Steam, а уже полученные
+	// достижения переносятся в Steam (например, после игры без него).
+	if a.Prof.Name == "" {
+		if n := []rune(platform.Current.PlayerName()); len(n) > 0 {
+			a.Prof.Name = string(n[:min(len(n), maxName)])
+			_ = a.Prof.Save()
+		}
+	}
+	for id := range a.Prof.Achievements {
+		platform.Current.Unlock(id)
+	}
 	if a.Prof.Name == "" {
 		a.scene = newNameScene(true)
 	} else {
@@ -83,6 +95,14 @@ func New() *App {
 // Goto плавно переключает сцену.
 func (a *App) Goto(s Scene) {
 	a.next = s
+	switch s := s.(type) {
+	case *playScene:
+		platform.Current.SetStatus(s.track.Title())
+	case *duelScene:
+		platform.Current.SetStatus("Дуэль · " + s.track.Title())
+	case *menuScene:
+		platform.Current.SetStatus("В меню")
+	}
 }
 
 // Toast показывает короткое сообщение внизу экрана.
@@ -91,6 +111,7 @@ func (a *App) Toast(s string) { a.toast, a.toastT = s, 150 }
 // Update вызывается Ebitengine 60 раз в секунду.
 func (a *App) Update() error {
 	a.Frame++
+	platform.Current.Update()
 	a.Pointer.update()
 	if inpututil.IsKeyJustPressed(ebiten.KeyF11) ||
 		(inpututil.IsKeyJustPressed(ebiten.KeyEnter) && ebiten.IsKeyPressed(ebiten.KeyAlt)) {
