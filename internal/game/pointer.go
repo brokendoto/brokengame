@@ -138,9 +138,32 @@ type touchControls struct {
 	dashOn   bool
 	shieldOn bool
 	pauseTap bool
+
+	// Раскладка: зона джойстика по x и места кнопок. Нулевая — одиночная игра.
+	x0, x1       float64
+	dashX, dashY float64
+	abX, abY     float64
+	label        string // подпись над джойстиком (в дуэли — «Игрок 1»)
+	tint         rgbaT
+}
+
+// duelTouch — раскладка для дуэли на планшете: каждому игроку половина экрана.
+func duelTouch(i int) touchControls {
+	if i == 0 {
+		return touchControls{x0: 0, x1: ScreenW / 2, dashX: 560, dashY: 610, abX: 440, abY: 652, label: "Игрок 1", tint: duelColors[0]}
+	}
+	return touchControls{x0: ScreenW / 2, x1: ScreenW, dashX: dashBtnX, dashY: dashBtnY, abX: shieldBtnX, abY: shieldBtnY, label: "Игрок 2", tint: duelColors[1]}
+}
+
+func (c *touchControls) layout() {
+	if c.x1 == 0 {
+		c.x0, c.x1 = 0, stickZoneW
+		c.dashX, c.dashY, c.abX, c.abY = dashBtnX, dashBtnY, shieldBtnX, shieldBtnY
+	}
 }
 
 func (c *touchControls) update(p *pointer) sim.Input {
+	c.layout()
 	c.dashOn, c.shieldOn, c.pauseTap = false, false, false
 	if c.stickOn {
 		if _, ok := p.touches[c.stickID]; !ok {
@@ -151,11 +174,11 @@ func (c *touchControls) update(p *pointer) sim.Input {
 		switch {
 		case c.stickOn && id == c.stickID:
 			c.kx, c.ky = t.x, t.y
-		case math.Hypot(t.x-dashBtnX, t.y-dashBtnY) < dashBtnR*1.25:
+		case math.Hypot(t.x-c.dashX, t.y-c.dashY) < dashBtnR*1.25:
 			c.dashOn = true
-		case math.Hypot(t.x-shieldBtnX, t.y-shieldBtnY) < shieldBtnR*1.3:
+		case math.Hypot(t.x-c.abX, t.y-c.abY) < shieldBtnR*1.3:
 			c.shieldOn = true
-		case !c.stickOn && t.sx < stickZoneW && t.sy > hudBottom:
+		case !c.stickOn && t.sx >= c.x0 && t.sx < c.x1 && t.sy > hudBottom:
 			c.stickID, c.stickOn = id, true
 			c.ox, c.oy, c.kx, c.ky = t.sx, t.sy, t.x, t.y
 		}
@@ -197,6 +220,7 @@ func (c *touchControls) update(p *pointer) sim.Input {
 }
 
 func (c *touchControls) draw(dst *ebiten.Image, dashCD, abCD int, ab sim.Ability) {
+	c.layout()
 	white := rgba(255, 255, 255, 255)
 	if c.stickOn {
 		strokeCircle(dst, c.ox, c.oy, stickR, 3, withAlpha(white, 0.35))
@@ -207,8 +231,11 @@ func (c *touchControls) draw(dst *ebiten.Image, dashCD, abCD int, ab sim.Ability
 		}
 		fillCircle(dst, kx, ky, 38, withAlpha(white, 0.45))
 	} else {
-		strokeCircle(dst, 170, 590, stickR, 3, withAlpha(white, 0.15))
-		drawText(dst, "двигай пальцем", 16, false, 170, 580, Center, withAlpha(white, 0.3))
+		strokeCircle(dst, c.x0+170, 590, stickR, 3, withAlpha(white, 0.15))
+		drawText(dst, "двигай пальцем", 16, false, c.x0+170, 580, Center, withAlpha(white, 0.3))
+		if c.label != "" {
+			drawText(dst, c.label, 18, true, c.x0+170, 470, Center, withAlpha(c.tint, 0.6))
+		}
 	}
 	btn := func(x, y, r float64, label string, on bool, cd int, c rgbaT) {
 		a := 0.35
@@ -226,8 +253,8 @@ func (c *touchControls) draw(dst *ebiten.Image, dashCD, abCD int, ab sim.Ability
 		}
 		drawText(dst, label, size, true, x, y-float64(size)*0.6, Center, withAlpha(white, 0.9))
 	}
-	btn(dashBtnX, dashBtnY, dashBtnR, "Рывок", c.dashOn, dashCD, rgba(255, 170, 60, 255))
-	btn(shieldBtnX, shieldBtnY, shieldBtnR, sim.Abilities[ab].Name, c.shieldOn, abCD, abilityColor(ab))
+	btn(c.dashX, c.dashY, dashBtnR, "Рывок", c.dashOn, dashCD, rgba(255, 170, 60, 255))
+	btn(c.abX, c.abY, shieldBtnR, sim.Abilities[ab].Name, c.shieldOn, abCD, abilityColor(ab))
 }
 
 // drawBackButton рисует кнопку «Назад» в углу и регистрирует зону нажатия.

@@ -171,19 +171,28 @@ var dirs = [4]Pt{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}
 
 // BFS заполняет поле расстояний от from поиском в ширину.
 func (lv *Level) BFS(from Pt, d *DistField) {
+	src := [1]Pt{from}
+	lv.BFSMulti(src[:], d)
+}
+
+// BFSMulti — поиск в ширину сразу от нескольких клеток: в каждой клетке
+// оказывается расстояние до ближайшей из них (нужно для дуэли).
+func (lv *Level) BFSMulti(from []Pt, d *DistField) {
 	for y := range d {
 		for x := range d[y] {
 			d[y][x] = -1
 		}
 	}
-	if lv.Solid(from.X, from.Y) {
-		return
-	}
 	var q [W * H]Pt
 	head, tail := 0, 0
-	q[tail] = from
-	tail++
-	d[from.Y][from.X] = 0
+	for _, f := range from {
+		if lv.Solid(f.X, f.Y) || d[f.Y][f.X] == 0 {
+			continue
+		}
+		q[tail] = f
+		tail++
+		d[f.Y][f.X] = 0
+	}
 	for head < tail {
 		c := q[head]
 		head++

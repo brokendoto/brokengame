@@ -31,14 +31,19 @@ type App struct {
 	Frame   int
 	Pointer *pointer
 
-	scene    Scene
-	next     Scene
-	fade     float64
-	quit     bool
-	toast    string
-	toastT   int
-	bgDust   []dust
-	Headless bool // без окна (для скриншотов и тестов)
+	scene  Scene
+	next   Scene
+	fade   float64
+	quit   bool
+	toast  string
+	toastT int
+
+	// Дуэль: счёт матчей за сеанс и последний выбранный уровень.
+	duelWins  [2]int
+	duelWorld sim.World
+	duelLevel int
+	bgDust    []dust
+	Headless  bool // без окна (для скриншотов и тестов)
 }
 
 type dust struct{ x, y, vx, vy, r, phase float64 }

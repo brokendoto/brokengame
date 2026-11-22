@@ -34,7 +34,10 @@ const (
 	EvVanish  // бонусный предмет исчез
 	EvBlinkIn // призрак начинает телепорт
 	EvBlinkOut
-	EvHole // затянуло в чёрную дыру
+	EvHole     // затянуло в чёрную дыру
+	EvKnockout // дуэль: игрок выбит (N — номер игрока)
+	EvRespawn  // дуэль: игрок вернулся на старт
+	EvStun     // дуэль: соперник оглушён толчком или способностью
 )
 
 // Event — событие шага.
@@ -42,6 +45,7 @@ type Event struct {
 	Kind EventKind
 	X, Y float64
 	N    int
+	P    int // чей это игрок (в дуэли 0 или 1, иначе 0)
 }
 
 // Player — герой.
@@ -137,6 +141,7 @@ type State struct {
 
 	nextRock, nextCave int
 	distP, distAhead   DistField
+	duel               *Duel // не nil в режиме дуэли
 }
 
 // NewState начинает партию на уровне.
@@ -203,7 +208,11 @@ func comboMul(combo int) float64 {
 }
 
 func (s *State) emit(k EventKind, x, y float64, n int) {
-	s.Events = append(s.Events, Event{Kind: k, X: x, Y: y, N: n})
+	e := Event{Kind: k, X: x, Y: y, N: n}
+	if s.duel != nil && s.duel.cur >= 0 {
+		e.P = s.duel.cur
+	}
+	s.Events = append(s.Events, e)
 }
 
 // Step продвигает партию на один шаг с нажатыми кнопками in.
@@ -451,6 +460,11 @@ func (s *State) hurt(reason string) (blocked bool) {
 	p.Invuln = InvulnTicks
 	s.emit(EvHit, p.X, p.Y, s.Lives)
 	if s.Lives <= 0 {
+		if s.duel != nil {
+			// В дуэли проигравших нет: игрок выбит и вернётся на старт.
+			s.emit(EvKnockout, p.X, p.Y, s.duel.cur)
+			return false
+		}
 		s.lose(reason)
 	}
 	return false
@@ -574,6 +588,7 @@ func (s *State) updateChasers() {
 			c.Stun--
 			continue
 		}
+		s.focus(c.X, c.Y) // в дуэли враг охотится на ближайшего
 		speed := s.Lv.Cfg.EnemySpeed
 		switch c.Kind {
 		case ChaserCunning:
@@ -609,13 +624,15 @@ func (s *State) updateChasers() {
 			s.stepChaser(c, i, step, field)
 		}
 
-		if math.Hypot(s.P.X-c.X, s.P.Y-c.Y) < PlayerRadius+ChaserRadius {
-			if s.hurt(s.Lv.Rules().ChaserHit) {
-				c.Stun = 90
-			} else if s.P.Invuln == InvulnTicks {
-				c.Stun = 45
+		s.eachPlayer(func() {
+			if c.Stun == 0 && math.Hypot(s.P.X-c.X, s.P.Y-c.Y) < PlayerRadius+ChaserRadius {
+				if s.hurt(s.Lv.Rules().ChaserHit) {
+					c.Stun = 90
+				} else if s.P.Invuln == InvulnTicks {
+					c.Stun = 45
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -687,8 +704,12 @@ func (s *State) updateRocks() {
 			} else if r.X < -1.5 || r.Y < -1.5 || r.X > W+1.5 || r.Y > H+1.5 {
 				r.Dead = true
 			}
-			if !r.Dead && math.Hypot(s.P.X-r.X, s.P.Y-r.Y) < PlayerRadius+RockRadius {
-				s.hurt(s.Lv.Rules().RockHit)
+			if !r.Dead {
+				s.eachPlayer(func() {
+					if math.Hypot(s.P.X-r.X, s.P.Y-r.Y) < PlayerRadius+RockRadius {
+						s.hurt(s.Lv.Rules().RockHit)
+					}
+				})
 			}
 		}
 		if !r.Dead {
@@ -742,6 +763,7 @@ func (s *State) updateCaves() {
 		if s.nextCave <= 0 {
 			c := CaveIn{Horizontal: s.RNG.Intn(2) == 0, Warn: CaveWarnTicks, Active: CaveHitTicks}
 			// Обвал прицеливается рядом с игроком, чтобы держать его в тонусе.
+			s.focusAny()
 			if c.Horizontal {
 				c.Line = clampInt(int(s.P.Y)+s.RNG.Intn(5)-2, 0, H-1)
 			} else {
@@ -761,15 +783,17 @@ func (s *State) updateCaves() {
 			}
 		} else {
 			c.Active--
-			var d float64
-			if c.Horizontal {
-				d = math.Abs(s.P.Y - (float64(c.Line) + 0.5))
-			} else {
-				d = math.Abs(s.P.X - (float64(c.Line) + 0.5))
-			}
-			if d < 0.5+PlayerRadius*0.5 {
-				s.hurt(s.Lv.Rules().BeamHit)
-			}
+			s.eachPlayer(func() {
+				var d float64
+				if c.Horizontal {
+					d = math.Abs(s.P.Y - (float64(c.Line) + 0.5))
+				} else {
+					d = math.Abs(s.P.X - (float64(c.Line) + 0.5))
+				}
+				if d < 0.5+PlayerRadius*0.5 {
+					s.hurt(s.Lv.Rules().BeamHit)
+				}
+			})
 		}
 		if c.Warn > 0 || c.Active > 0 {
 			alive = append(alive, c)
@@ -784,12 +808,14 @@ func (s *State) updateCaves() {
 func (s *State) SpikePhase(t SpikeTrap) int { return (s.HazTick + t.Phase) % SpikePeriod }
 
 func (s *State) updateSpikes() {
-	pc := Pt{int(s.P.X), int(s.P.Y)}
-	for _, t := range s.Lv.Spikes {
-		if t.P == pc && s.SpikePhase(t) >= SpikeUpFrom {
-			s.hurt(s.Lv.Rules().SpikeHit)
+	s.eachPlayer(func() {
+		pc := Pt{int(s.P.X), int(s.P.Y)}
+		for _, t := range s.Lv.Spikes {
+			if t.P == pc && s.SpikePhase(t) >= SpikeUpFrom {
+				s.hurt(s.Lv.Rules().SpikeHit)
+			}
 		}
-	}
+	})
 }
 
 func clampInt(v, lo, hi int) int {

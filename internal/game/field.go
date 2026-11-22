@@ -24,6 +24,9 @@ const (
 func px(x float64) float64 { return FieldX + x*CellPx }
 func py(y float64) float64 { return FieldY + y*CellPx }
 
+// Цвета игроков дуэли.
+var duelColors = [2]rgbaT{rgba(255, 150, 70, 255), rgba(90, 200, 255, 255)}
+
 // Цвета кристалла шахты.
 var (
 	crystalBody = rgba(90, 220, 255, 255)
@@ -40,6 +43,7 @@ func cellHash(x, y, k int) uint64 {
 // fieldView — отрисовщик уровня; статичная часть (пол, стены, зоны)
 // рисуется один раз в отдельную картинку.
 type fieldView struct {
+	duel   *sim.Duel // не nil в дуэли: рисуем двух героев
 	lv     *sim.Level
 	w      sim.World
 	static *ebiten.Image
@@ -184,21 +188,55 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 		a := float64(i+1) / float64(len(trail)+1) * 0.35
 		fillCircle(field, px(p[0])+ox, py(p[1])+oy, 0.3*CellPx, withAlpha(rgba(255, 190, 90, 255), a))
 	}
-	// Игрок (мигает после удара).
-	p := st.P
-	pxp, pyp := px(p.X)+ox, py(p.Y)+oy
-	if p.MagnetT > 0 {
-		a := 0.25
-		if p.MagnetT < 60 && (p.MagnetT/6)%2 == 0 {
-			a = 0.1
+	// Игрок (мигает после удара). В дуэли — оба, с цветными кольцами.
+	heroes := []sim.Player{st.P}
+	if f.duel != nil {
+		heroes = heroes[:0]
+		for i, d := range f.duel.D {
+			if d.Down > 0 {
+				x, y := px(float64(d.Start.X)+0.5)+ox, py(float64(d.Start.Y)+0.5)+oy
+				strokeCircle(field, x, y, 18, 3, withAlpha(duelColors[i], 0.6))
+				drawText(field, itoa(d.Down/sim.TPS+1), 20, true, x, y-12, Center, duelColors[i])
+				continue
+			}
+			heroes = append(heroes, d.P)
 		}
-		strokeCircle(field, pxp, pyp, sim.MagnetRadius*CellPx, 2, withAlpha(abilityColor(sim.AbMagnet), a))
-		fillCircle(field, pxp, pyp, sim.MagnetRadius*CellPx, withAlpha(abilityColor(sim.AbMagnet), a*0.15))
 	}
-	if p.Invuln == 0 || (frame/4)%2 == 0 {
-		drawHero(field, w, p, pxp, pyp, t, 1, false)
+	for _, p := range heroes {
+		x, y := px(p.X)+ox, py(p.Y)+oy
+		if p.MagnetT > 0 {
+			a := 0.25
+			if p.MagnetT < 60 && (p.MagnetT/6)%2 == 0 {
+				a = 0.1
+			}
+			strokeCircle(field, x, y, sim.MagnetRadius*CellPx, 2, withAlpha(abilityColor(sim.AbMagnet), a))
+			fillCircle(field, x, y, sim.MagnetRadius*CellPx, withAlpha(abilityColor(sim.AbMagnet), a*0.15))
+		}
+	}
+	if f.duel != nil {
+		for i, d := range f.duel.D {
+			if d.Down > 0 {
+				continue
+			}
+			x, y := px(d.P.X)+ox, py(d.P.Y)+oy
+			fillPoly(field, ellipse(x, y+12, 19, 9, 0, 18), withAlpha(duelColors[i], 0.55))
+			if d.P.Invuln == 0 || (frame/4)%2 == 0 {
+				drawHero(field, w, d.P, x, y, t, 1, false)
+			}
+			drawTextShadow(field, itoa(i+1), 15, true, x, y-38, Center, duelColors[i])
+			if d.Stun > 0 {
+				for k := 0; k < 3; k++ {
+					a := t*0.2 + float64(k)*2.09
+					fillCircle(field, x+math.Cos(a)*15, y-24+math.Sin(a)*4, 3, rgba(255, 240, 120, 255))
+				}
+			}
+		}
+	} else if st.P.Invuln == 0 || (frame/4)%2 == 0 {
+		drawHero(field, w, st.P, px(st.P.X)+ox, py(st.P.Y)+oy, t, 1, false)
 	}
 	fx.draw(field, 0, 0)
+	p := st.P
+	pxp, pyp := px(p.X)+ox, py(p.Y)+oy
 
 	// Туман храма — поверх всего, что в нём.
 	if w == sim.Temple {
@@ -220,7 +258,8 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 
 	// Темнота: светло только вокруг героя.
 	lx, ly := pxp+p.FX*18, pyp+p.FY*18
-	if th.darkness > 0 {
+	dark := th.darkness > 0 && f.duel == nil // в дуэли светло, чтобы видели оба
+	if dark {
 		dop := &ebiten.DrawImageOptions{}
 		scale := 2800.0 / 256
 		dop.GeoM.Translate(-128, -128)
@@ -275,11 +314,13 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 			glow(field, px(c.X)+ox, py(c.Y)+oy, 22, eye, 0.5)
 		}
 	}
-	if th.darkness > 0 {
+	if dark {
 		glow(field, lx, ly, 70, th.lampColor, 0.18)
 	}
-	if p.ShieldT > 0 {
-		glow(field, pxp, pyp, 50, colAccent, 0.35)
+	for _, h := range heroes {
+		if h.ShieldT > 0 {
+			glow(field, px(h.X)+ox, py(h.Y)+oy, 50, colAccent, 0.35)
+		}
 	}
 	for _, c := range st.Caves {
 		if c.Warn == 0 {
