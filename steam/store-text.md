@@ -22,7 +22,8 @@
   одинаковое для всех.
 * **Дуэль на одном экране.** Двое на одной клавиатуре или с двумя
   геймпадами: толкайтесь, оглушайте и успейте к выходу первым.
-* **19 достижений**, переназначение клавиш, поддержка геймпада и Steam Deck.
+* **Марафон**: уровни подряд через все миры, жизни переносятся, рекорды недели.
+* **21 достижение**, переназначение клавиш, поддержка геймпада и Steam Deck.
 
 ## English
 
@@ -47,7 +48,8 @@ faster.
   challenge that is the same for everyone.
 * **Same-screen duel.** Two players on one keyboard or two gamepads: shove,
   stun and race to the exit.
-* **19 achievements**, key rebinding, full gamepad and Steam Deck support.
+* **Marathon**: back-to-back levels across all worlds, lives carry over, weekly leaderboard.
+* **21 achievements**, key rebinding, full gamepad and Steam Deck support.
 
 **Теги:** Arcade, Action, Local Multiplayer, Score Attack, Top-Down, Casual,
 Controller, 2D.

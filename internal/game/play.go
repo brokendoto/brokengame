@@ -46,6 +46,8 @@ type playScene struct {
 	banner    string
 	bannerT   int
 
+	mara *marathonRun // не nil — этап марафона
+
 	// Счётчики для достижений.
 	goldenGot, cursedGot int
 	holeHit              bool
@@ -108,14 +110,19 @@ func (s *playScene) Update(a *App) {
 	if s.st.Status != sim.Playing {
 		s.endT++
 		if s.endT > 80 || (s.endT > 20 && (okPressed() || a.Pointer.tapped)) {
-			a.Goto(newResultScene(a, s))
+			if s.mara != nil {
+				a.Goto(newMarathonScene(a, s))
+			} else {
+				a.Goto(newResultScene(a, s))
+			}
+			return
 		}
-		if retryPressed() {
+		if retryPressed() && s.mara == nil {
 			a.Goto(newPlayScene(a, s.track))
 		}
 		return
 	}
-	if retryPressed() {
+	if retryPressed() && s.mara == nil {
 		a.Goto(newPlayScene(a, s.track))
 		return
 	}
@@ -275,13 +282,23 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 
 var pauseItems = []string{"Продолжить", "Начать заново", "Выйти в меню"}
 
+// В марафоне этап нельзя переиграть: можно только закончить забег.
+var pauseItemsMarathon = []string{"Продолжить", "Закончить забег", "Выйти в меню"}
+
+func (s *playScene) pauseMenu() []string {
+	if s.mara != nil {
+		return pauseItemsMarathon
+	}
+	return pauseItems
+}
+
 func (s *playScene) updatePause(a *App) {
 	if s.nav.dir(navUp) {
-		s.pauseSel = (s.pauseSel + len(pauseItems) - 1) % len(pauseItems)
+		s.pauseSel = (s.pauseSel + len(s.pauseMenu()) - 1) % len(s.pauseMenu())
 		a.Sound.Play(sfx.Menu)
 	}
 	if s.nav.dir(navDown) {
-		s.pauseSel = (s.pauseSel + 1) % len(pauseItems)
+		s.pauseSel = (s.pauseSel + 1) % len(s.pauseMenu())
 		a.Sound.Play(sfx.Menu)
 	}
 	if pausePressed() {
@@ -298,6 +315,13 @@ func (s *playScene) updatePause(a *App) {
 		case 0:
 			s.paused = false
 		case 1:
+			if s.mara != nil {
+				// Этап засчитывается как проигранный, забег подводится.
+				s.st.Status = sim.Lost
+				s.st.LoseReason = "Забег завершён"
+				a.Goto(newMarathonScene(a, s))
+				return
+			}
 			a.Goto(newPlayScene(a, s.track))
 		case 2:
 			a.Goto(newMenuScene())
@@ -356,7 +380,7 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 		drawPanel(dst, ScreenW/2-200, 220, 400, 260)
 		drawText(dst, "Пауза", 36, true, ScreenW/2, 240, Center, colText)
 		s.hits.reset()
-		for i, it := range pauseItems {
+		for i, it := range s.pauseMenu() {
 			s.hits.add(rect{ScreenW/2 - 160, 305 + float64(i)*52, 320, 48}, i)
 			c := colDim
 			if i == s.pauseSel {
@@ -376,6 +400,8 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	title := themes[s.track.World].short + " · ур. " + itoa(s.track.Level)
 	if s.track.Daily != "" {
 		title = "День · " + themes[s.track.World].short
+	} else if s.mara != nil {
+		title = "Этап " + itoa(s.track.Stage) + " · " + themes[s.track.World].short
 	}
 	drawText(dst, title, 16, false, FieldX+14, 14, Left, colDim)
 	for i := 0; i < s.lv.Lives; i++ {
@@ -426,8 +452,13 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	}
 
 	// Очки за кристаллы.
-	drawText(dst, "очки", 14, false, 900, 14, Left, colDim)
-	drawText(dst, fmtScore(st.ItemScore), 30, true, 900, 30, Left, colText)
+	if s.mara != nil {
+		drawText(dst, "очки забега", 14, false, 900, 14, Left, colDim)
+		drawText(dst, fmtScore(s.mara.score+st.ItemScore), 30, true, 900, 30, Left, colText)
+	} else {
+		drawText(dst, "очки", 14, false, 900, 14, Left, colDim)
+		drawText(dst, fmtScore(st.ItemScore), 30, true, 900, 30, Left, colText)
+	}
 
 	// Способности.
 	dashKey, abKey := hintKey(controls.Solo, controls.Dash), hintKey(controls.Solo, controls.Ability)
