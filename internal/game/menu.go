@@ -9,6 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/brokendoto/brokengame/internal/achieve"
+	"github.com/brokendoto/brokengame/internal/platform"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
@@ -181,7 +182,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	} else {
 		keyHint(dst, "↑↓ — выбор   ·   Enter — ок   ·   ←→ — сложность   ·   F11 — полный экран   ·   M — звук")
 	}
-	drawText(dst, "v0.6 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
+	drawText(dst, versionText(), 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
 }
 
 // --- Выбор уровня ------------------------------------------------------------
@@ -684,4 +685,15 @@ func (n *nameScene) drawKeyboard(dst *ebiten.Image) {
 	if !n.first {
 		drawBackButton(dst, &n.hits, keyBack)
 	}
+}
+
+// Version — версия игры.
+const Version = "0.7"
+
+func versionText() string {
+	v := "v" + Version + " · Go + Ebitengine"
+	if n := platform.Current.Name(); n != "" {
+		v += " · " + n
+	}
+	return v
 }

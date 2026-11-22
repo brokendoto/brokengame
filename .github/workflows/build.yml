@@ -75,6 +75,27 @@ jobs:
           name: Pyatimirye-web
           path: dist/web
 
+  steam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Системные библиотеки
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev
+      - name: Сборка с тегом steam (Windows и Linux/Steam Deck)
+        run: |
+          go vet -tags steam ./...
+          GOOS=windows go vet -tags steam ./...
+          mkdir -p steam/content/windows steam/content/linux
+          GOOS=windows GOARCH=amd64 go build -tags steam -trimpath -ldflags "-s -w -H=windowsgui" -o steam/content/windows/Pyatimirye.exe ./cmd/pyatimirye
+          go build -tags steam -trimpath -ldflags "-s -w" -o steam/content/linux/pyatimirye ./cmd/pyatimirye
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pyatimirye-steam
+          path: steam/content
+
   android:
     runs-on: ubuntu-latest
     steps:
