@@ -95,10 +95,17 @@ type Track struct {
 	Level int // 1..LevelsPerWorld
 	Diff  Difficulty
 	Daily string // дата ГГГГ-ММ-ДД для испытания дня, иначе пусто
+
+	// Марафон: неделя (ГГГГ-Wнн) и номер этапа с 1. Пусто — не марафон.
+	Marathon string
+	Stage    int
 }
 
 // Key — строковый ключ трассы для таблиц рекордов.
 func (t Track) Key() string {
+	if t.Marathon != "" {
+		return "marathon-" + t.Marathon // одна таблица на весь марафон недели
+	}
 	if t.Daily != "" {
 		return "daily-" + t.Daily
 	}
@@ -108,6 +115,9 @@ func (t Track) Key() string {
 // Seed — зерно генерации. Не зависит от компьютера, поэтому уровень
 // одинаков у всех игроков (важно для будущих онлайн-таблиц Steam).
 func (t Track) Seed() uint64 {
+	if t.Marathon != "" {
+		return Hash(fmt.Sprintf("pyatimirye/marathon/%s/%d", t.Marathon, t.Stage))
+	}
 	if t.Daily != "" {
 		return Hash("pyatimirye/daily/" + t.Daily)
 	}
@@ -118,6 +128,9 @@ func (t Track) Seed() uint64 {
 
 // Title — человекочитаемое название трассы.
 func (t Track) Title() string {
+	if t.Marathon != "" {
+		return fmt.Sprintf("Марафон · этап %d · %s", t.Stage, Worlds[t.World].Name)
+	}
 	if t.Daily != "" {
 		return "Испытание дня " + t.Daily + " · " + Worlds[t.World].Name
 	}
