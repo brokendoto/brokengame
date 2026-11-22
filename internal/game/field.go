@@ -329,7 +329,7 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 		}
 	}
 	fx.drawTexts(field, 0, 0)
-	if fx.flash > 0.01 {
+	if fx.flash > 0.01 && screenShake {
 		fillRect(field, FieldX, FieldY, FieldW, FieldH, withAlpha(rgba(200, 30, 30, 255), fx.flash*0.35))
 	}
 	roundRectStroke(dst, FieldX-3, FieldY-3, FieldW+6, FieldH+6, 6, 3, lerpColor(th.wall, th.wallLo, 0.3))

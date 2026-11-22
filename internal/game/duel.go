@@ -2,10 +2,12 @@ package game
 
 import (
 	"math"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
 )
@@ -148,9 +150,25 @@ func (d *duelSetupScene) Draw(a *App, dst *ebiten.Image) {
 
 	// Управление игроков.
 	ab := sim.Abilities[sim.WorldRules[d.world].Ability]
+	keys := func(l int, act controls.Action) string {
+		var out []string
+		for _, k := range layouts[l][act] {
+			if k != "" {
+				out = append(out, keyLabel(k))
+			}
+		}
+		if len(out) == 0 {
+			return "не назначено"
+		}
+		return strings.Join(out, " или ")
+	}
+	move := func(l int) string {
+		return keyLabel(layouts[l].First(controls.Up)) + " " + keyLabel(layouts[l].First(controls.Left)) + " " +
+			keyLabel(layouts[l].First(controls.Down)) + " " + keyLabel(layouts[l].First(controls.Right))
+	}
 	panels := [2][]string{
-		{"Движение — W A S D", "Рывок — Space или левый Shift", "«" + ab.Name + "» — E или Q", "или первый из двух геймпадов"},
-		{"Движение — стрелки", "Рывок — правый Shift, Enter или L", "«" + ab.Name + "» — правый Ctrl, / или K", "или геймпад (если он один)"},
+		{"Движение — " + move(controls.Duel1), "Рывок — " + keys(controls.Duel1, controls.Dash), "«" + ab.Name + "» — " + keys(controls.Duel1, controls.Ability), "или первый из двух геймпадов"},
+		{"Движение — " + move(controls.Duel2), "Рывок — " + keys(controls.Duel2, controls.Dash), "«" + ab.Name + "» — " + keys(controls.Duel2, controls.Ability), "или геймпад (если он один)"},
 	}
 	if a.Pointer.touchMode {
 		panels = [2][]string{

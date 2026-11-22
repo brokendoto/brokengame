@@ -24,9 +24,7 @@ const (
 	miRecords
 	miDiff
 	miPlayer
-	miGhost
-	miSound
-	miFullscreen
+	miSettings
 	miQuit
 )
 
@@ -39,10 +37,7 @@ type menuScene struct {
 }
 
 func newMenuScene() *menuScene {
-	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miDiff, miPlayer, miGhost, miSound}}
-	if !IsMobile() {
-		m.items = append(m.items, miFullscreen)
-	}
+	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miDiff, miPlayer, miSettings}}
 	if CanQuit() {
 		m.items = append(m.items, miQuit)
 	}
@@ -50,12 +45,6 @@ func newMenuScene() *menuScene {
 }
 
 func (m *menuScene) label(a *App, it menuItem) string {
-	on := func(b bool) string {
-		if b {
-			return "вкл"
-		}
-		return "выкл"
-	}
 	switch it {
 	case miCampaign:
 		return "Играть: " + sim.Worlds[a.Prof.World].Name
@@ -69,12 +58,8 @@ func (m *menuScene) label(a *App, it menuItem) string {
 		return "Сложность:  ‹ " + sim.Difficulties[a.Prof.Diff].Name + " ›"
 	case miPlayer:
 		return "Игрок: " + a.Prof.Name
-	case miGhost:
-		return "Призрак соперника: " + on(a.Prof.ShowGhost)
-	case miSound:
-		return "Звук: " + on(!a.Sound.Muted)
-	case miFullscreen:
-		return "Полный экран: " + on(ebiten.IsFullscreen())
+	case miSettings:
+		return "Настройки"
 	case miQuit:
 		return "Выход"
 	}
@@ -132,13 +117,8 @@ func (m *menuScene) Update(a *App) {
 		_ = a.Prof.Save()
 	case miPlayer:
 		a.Goto(newNameScene(false))
-	case miGhost:
-		a.Prof.ShowGhost = !a.Prof.ShowGhost
-		_ = a.Prof.Save()
-	case miSound:
-		a.SetMuted(!a.Sound.Muted)
-	case miFullscreen:
-		a.SetFullscreen(!ebiten.IsFullscreen())
+	case miSettings:
+		a.Goto(newSettingsScene())
 	case miQuit:
 		a.Quit()
 	}
@@ -195,7 +175,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	} else {
 		keyHint(dst, "↑↓ — выбор   ·   Enter — ок   ·   ←→ — сложность   ·   F11 — полный экран   ·   M — звук")
 	}
-	drawText(dst, "v0.4 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
+	drawText(dst, "v0.5 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
 }
 
 // --- Выбор уровня ------------------------------------------------------------

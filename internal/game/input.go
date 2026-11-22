@@ -1,9 +1,12 @@
 package game
 
 import (
+	"strings"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/sim"
 )
 
@@ -14,8 +17,6 @@ var (
 	keysDown   = []ebiten.Key{ebiten.KeyS, ebiten.KeyArrowDown}
 	keysLeft   = []ebiten.Key{ebiten.KeyA, ebiten.KeyArrowLeft}
 	keysRight  = []ebiten.Key{ebiten.KeyD, ebiten.KeyArrowRight}
-	keysDash   = []ebiten.Key{ebiten.KeySpace, ebiten.KeyShiftLeft, ebiten.KeyShiftRight}
-	keysAbil   = []ebiten.Key{ebiten.KeyE, ebiten.KeyQ}
 	keysOK     = []ebiten.Key{ebiten.KeyEnter, ebiten.KeyNumpadEnter, ebiten.KeySpace}
 	keysBack   = []ebiten.Key{ebiten.KeyEscape, ebiten.KeyBackspace}
 	keysPause  = []ebiten.Key{ebiten.KeyEscape, ebiten.KeyP}
@@ -78,69 +79,34 @@ func padAxis(a ebiten.StandardGamepadAxis) float64 {
 
 // readPlayInput собирает нажатия игрока в маску для симуляции.
 func readPlayInput() sim.Input {
-	var in sim.Input
+	in := readKeys(controls.Solo)
 	ax, ay := padAxis(ebiten.StandardGamepadAxisLeftStickHorizontal), padAxis(ebiten.StandardGamepadAxisLeftStickVertical)
-	if anyPressed(keysUp) || padPressed(ebiten.StandardGamepadButtonLeftTop) || ay < -0.4 {
+	if padPressed(ebiten.StandardGamepadButtonLeftTop) || ay < -0.4 {
 		in |= sim.InUp
 	}
-	if anyPressed(keysDown) || padPressed(ebiten.StandardGamepadButtonLeftBottom) || ay > 0.4 {
+	if padPressed(ebiten.StandardGamepadButtonLeftBottom) || ay > 0.4 {
 		in |= sim.InDown
 	}
-	if anyPressed(keysLeft) || padPressed(ebiten.StandardGamepadButtonLeftLeft) || ax < -0.4 {
+	if padPressed(ebiten.StandardGamepadButtonLeftLeft) || ax < -0.4 {
 		in |= sim.InLeft
 	}
-	if anyPressed(keysRight) || padPressed(ebiten.StandardGamepadButtonLeftRight) || ax > 0.4 {
+	if padPressed(ebiten.StandardGamepadButtonLeftRight) || ax > 0.4 {
 		in |= sim.InRight
 	}
-	if anyPressed(keysDash) || padPressed(ebiten.StandardGamepadButtonRightBottom) || padPressed(ebiten.StandardGamepadButtonFrontBottomRight) {
+	if padPressed(ebiten.StandardGamepadButtonRightBottom) || padPressed(ebiten.StandardGamepadButtonFrontBottomRight) {
 		in |= sim.InDash
 	}
-	if anyPressed(keysAbil) || padPressed(ebiten.StandardGamepadButtonRightLeft) || padPressed(ebiten.StandardGamepadButtonFrontBottomLeft) {
+	if padPressed(ebiten.StandardGamepadButtonRightLeft) || padPressed(ebiten.StandardGamepadButtonFrontBottomLeft) {
 		in |= sim.InAbility
 	}
 	return in
 }
 
-// Управление в дуэли: левый игрок — WASD, правый — стрелки. Геймпады:
-// при двух подключённых первый у левого игрока, второй у правого; если
-// геймпад один, он у правого игрока (левый играет на клавиатуре).
-var duelKeys = [2]struct{ up, down, left, right, dash, abil []ebiten.Key }{
-	{
-		up: []ebiten.Key{ebiten.KeyW}, down: []ebiten.Key{ebiten.KeyS},
-		left: []ebiten.Key{ebiten.KeyA}, right: []ebiten.Key{ebiten.KeyD},
-		dash: []ebiten.Key{ebiten.KeySpace, ebiten.KeyShiftLeft},
-		abil: []ebiten.Key{ebiten.KeyE, ebiten.KeyQ},
-	},
-	{
-		up: []ebiten.Key{ebiten.KeyArrowUp}, down: []ebiten.Key{ebiten.KeyArrowDown},
-		left: []ebiten.Key{ebiten.KeyArrowLeft}, right: []ebiten.Key{ebiten.KeyArrowRight},
-		dash: []ebiten.Key{ebiten.KeyShiftRight, ebiten.KeyEnter, ebiten.KeyNumpad0, ebiten.KeyL},
-		abil: []ebiten.Key{ebiten.KeyControlRight, ebiten.KeySlash, ebiten.KeyNumpadDecimal, ebiten.KeyK},
-	},
-}
-
-// readDuelInput — кнопки i-го игрока дуэли.
+// readDuelInput — кнопки i-го игрока дуэли. Геймпады: при двух
+// подключённых первый у левого игрока, второй у правого; если геймпад
+// один, он у правого игрока (левый играет на клавиатуре).
 func readDuelInput(i int) sim.Input {
-	k := &duelKeys[i]
-	var in sim.Input
-	if anyPressed(k.up) {
-		in |= sim.InUp
-	}
-	if anyPressed(k.down) {
-		in |= sim.InDown
-	}
-	if anyPressed(k.left) {
-		in |= sim.InLeft
-	}
-	if anyPressed(k.right) {
-		in |= sim.InRight
-	}
-	if anyPressed(k.dash) {
-		in |= sim.InDash
-	}
-	if anyPressed(k.abil) {
-		in |= sim.InAbility
-	}
+	in := readKeys(controls.Duel1 + i)
 	ids := pads()
 	var std []ebiten.GamepadID
 	for _, id := range ids {
@@ -243,4 +209,79 @@ func pausePressed() bool {
 
 func retryPressed() bool {
 	return anyJust(keysRetry) || padJust(ebiten.StandardGamepadButtonRightTop)
+}
+
+// --- переназначаемые клавиши ----------------------------------------------------
+
+// layouts — текущие раскладки (строки), binds — они же в виде клавиш Ebitengine.
+var (
+	layouts = controls.Defaults()
+	binds   [controls.LayoutCount][controls.ActionCount][]ebiten.Key
+)
+
+var actionBits = [controls.ActionCount]sim.Input{sim.InUp, sim.InDown, sim.InLeft, sim.InRight, sim.InDash, sim.InAbility}
+
+func parseKey(s string) (ebiten.Key, bool) {
+	var k ebiten.Key
+	if s == "" || k.UnmarshalText([]byte(s)) != nil {
+		return 0, false
+	}
+	return k, true
+}
+
+func keyValid(s string) bool { _, ok := parseKey(s); return ok }
+
+// setLayouts применяет раскладки.
+func setLayouts(all [controls.LayoutCount]controls.Layout) {
+	layouts = all
+	for l := range all {
+		for a := range all[l] {
+			binds[l][a] = binds[l][a][:0]
+			for _, name := range all[l][a] {
+				if k, ok := parseKey(name); ok {
+					binds[l][a] = append(binds[l][a], k)
+				}
+			}
+		}
+	}
+}
+
+func init() { setLayouts(controls.Defaults()) }
+
+// readKeys — нажатия по раскладке l.
+func readKeys(l int) sim.Input {
+	var in sim.Input
+	for a, keys := range binds[l] {
+		if anyPressed(keys) {
+			in |= actionBits[a]
+		}
+	}
+	return in
+}
+
+// keyLabel — короткое имя клавиши для подсказок.
+func keyLabel(s string) string {
+	names := map[string]string{
+		"ArrowUp": "↑", "ArrowDown": "↓", "ArrowLeft": "←", "ArrowRight": "→",
+		"Space": "Пробел", "ShiftLeft": "Л.Shift", "ShiftRight": "П.Shift",
+		"ControlLeft": "Л.Ctrl", "ControlRight": "П.Ctrl", "AltLeft": "Л.Alt", "AltRight": "П.Alt",
+		"Enter": "Enter", "NumpadEnter": "Num Enter", "Slash": "/", "Backslash": "\\",
+		"Comma": ",", "Period": ".", "Semicolon": ";", "Quote": "'", "BracketLeft": "[", "BracketRight": "]",
+		"Minus": "-", "Equal": "=", "Backquote": "`", "Tab": "Tab", "CapsLock": "Caps",
+	}
+	if n, ok := names[s]; ok {
+		return n
+	}
+	if strings.HasPrefix(s, "Digit") {
+		return s[5:]
+	}
+	if strings.HasPrefix(s, "Numpad") {
+		return "Num " + s[6:]
+	}
+	return s
+}
+
+// hintKey — первая клавиша действия в раскладке, для подсказок на экране.
+func hintKey(l int, a controls.Action) string {
+	return keyLabel(layouts[l].First(a))
 }

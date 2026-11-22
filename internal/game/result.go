@@ -5,6 +5,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/replay"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
@@ -129,7 +130,7 @@ func (r *resultScene) Draw(a *App, dst *ebiten.Image) {
 		drawText(dst, "Не получилось", 48, true, 380, 100, Center, colRed)
 		drawText(dst, r.reason, 26, false, 380, 168, Center, colText)
 		drawText(dst, "Собрано "+itoa(r.got)+" из "+itoa(r.total), 22, false, 380, 214, Center, colDim)
-		drawText(dst, "Совет: рывок (Space) неуязвим — им можно проскочить", 18, false, 380, 290, Center, colDim)
+		drawText(dst, "Совет: рывок ("+hintKey(controls.Solo, controls.Dash)+") неуязвим — им можно проскочить", 18, false, 380, 290, Center, colDim)
 		drawText(dst, "сквозь жука, а щит (E) отбрасывает врагов.", 18, false, 380, 316, Center, colDim)
 	} else {
 		drawText(dst, "Уровень пройден!", 44, true, 380, 92, Center, colGreen)
