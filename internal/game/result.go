@@ -31,6 +31,7 @@ type resultScene struct {
 	sel      int
 	nav      nav
 	items    []string
+	hits     hits
 }
 
 func newResultScene(a *App, p *playScene) *resultScene {
@@ -89,7 +90,11 @@ func (r *resultScene) Update(a *App) {
 		a.Goto(newLevelScene(a))
 		return
 	}
-	if okPressed() && r.t > 15 {
+	activate := okPressed()
+	if id, ok := r.hits.tapped(a); ok {
+		r.sel, activate = id, true
+	}
+	if activate && r.t > 15 {
 		a.Sound.Play(sfx.Select)
 		switch r.items[r.sel] {
 		case "Следующий уровень":
@@ -179,11 +184,13 @@ func (r *resultScene) Draw(a *App, dst *ebiten.Image) {
 	}
 
 	// Меню.
+	r.hits.reset()
 	for i, it := range r.items {
 		y := 578 + float64(i)*27
 		if len(r.items) == 2 {
 			y += 15
 		}
+		r.hits.add(rect{100, y - 4, 560, 27}, i)
 		c := colDim
 		if i == r.sel {
 			c = colAccent
@@ -199,7 +206,9 @@ func (r *resultScene) Draw(a *App, dst *ebiten.Image) {
 	if r.rank > 0 {
 		drawText(dst, "Твоё место: "+itoa(r.rank), 22, true, 975, 600, Center, colGold)
 	}
-	keyHint(dst, "Enter — выбрать   ·   R — сразу ещё раз   ·   Esc — к уровням")
+	if !a.Pointer.touchMode {
+		keyHint(dst, "Enter — выбрать   ·   R — сразу ещё раз   ·   Esc — к уровням")
+	}
 }
 
 // drawLeaderboard рисует таблицу рекордов.

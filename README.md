@@ -13,6 +13,8 @@
 |---|---|
 | ![Меню](docs/screens/menu.png) | ![Итоги](docs/screens/results.png) |
 
+**Платформы:** Windows, Linux, macOS, Android, iOS и браузер (WebAssembly).
+
 ## Как играть
 
 | Действие | Клавиатура | Геймпад |
@@ -25,6 +27,16 @@
 | Полный экран | F11 / Alt+Enter | |
 | Звук | M | |
 | Автопилот (демонстрация, F9) | F9 | |
+
+**На телефоне** управление сенсорное: левая половина экрана — плавающий джойстик
+(касаешься где угодно и ведёшь пальцем), справа кнопки «Рывок» и «Щит», касание верхней
+панели ставит на паузу. Меню нажимаются пальцем, имя вводится на экранной клавиатуре
+(русская и латинская раскладки). Экранные кнопки появляются и на компьютере с
+сенсорным экраном, а пункты меню можно нажимать мышью.
+
+| Телефон: игра | Телефон: ввод имени |
+|---|---|
+| ![Игра на телефоне](docs/screens/phone-play.png) | ![Клавиатура](docs/screens/phone-keyboard.png) |
 
 **Очки.** Каждый кристалл стоит 100 очков, умноженных на серию: если брать кристаллы
 не дольше чем через 2,5 с друг за другом, множитель растёт до ×3. В конце добавляются
@@ -73,8 +85,35 @@ python3 -m http.server -d dist/web 8000   # открыть http://localhost:8000
 
 Тесты: `go test ./internal/...`
 
-Готовый `Pyatimirye.exe` собирает GitHub Actions при каждом коммите: вкладка
-**Actions → build → Artifacts**.
+Все версии собирает GitHub Actions при каждом коммите: вкладка
+**Actions → build → Artifacts**. Там лежат `Pyatimirye-windows` (exe),
+`Pyatimirye-linux`, `Pyatimirye-macos`, `Pyatimirye-web`, `Pyatimirye-android` (APK)
+и `Pyatimirye-ios-xcframework`.
+
+### Android
+
+Нужны Android SDK и NDK (проще всего поставить через Android Studio) и JDK 17.
+
+```sh
+export ANDROID_HOME=~/Android/Sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<версия>
+go tool ebitenmobile bind -target android -androidapi 23 \
+  -javapkg com.brokendoto.pyatimirye -o android/app/libs/pyatimirye.aar ./mobile
+cd android && gradle assembleDebug     # или открыть папку android в Android Studio
+# APK: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+`ebitenmobile` превращает пакет `mobile/` в библиотеку `.aar` с готовым элементом
+`EbitenView`. Java-часть (`android/app/src/main/java/.../MainActivity.java`) только
+растягивает его на весь экран, передаёт игре папку для сохранений и ставит игру на паузу,
+когда приложение свёрнуто. Отладочный APK можно сразу поставить на телефон; для Google Play
+нужна подпись релизным ключом (`gradle assembleRelease` с настройками `signingConfigs`).
+
+### iOS
+
+На Mac с Xcode: `go tool ebitenmobile bind -target ios -o Pyatimirye.xcframework ./mobile`,
+затем фреймворк добавляется в проект Xcode, а на экран кладётся `MobileEbitenViewController`.
+Для установки на iPhone и публикации в App Store нужен аккаунт Apple Developer.
 
 Сохранения лежат в `%AppData%\Pyatimirye\` (`profile.json` с прогрессом и настройками,
 `records.json` с таблицами рекордов и записями забегов).
@@ -87,9 +126,16 @@ internal/sim/        правила игры без графики: уровен
 internal/replay/     упаковка записи нажатий (RLE + base64)
 internal/save/       профиль и таблицы рекордов (JSON), интерфейс Leaderboard
 internal/sfx/        синтез звуков в коде (синусоиды, шум, огибающие)
-internal/game/       сцены (меню, уровни, игра, итоги, рекорды), отрисовка, ввод
+internal/game/       сцены (меню, уровни, игра, итоги, рекорды), отрисовка, ввод, касания
 internal/assets/     встроенные ресурсы (иконка)
+mobile/              точка входа для Android и iOS (ebitenmobile)
+android/             проект Android: Activity на Java, манифест, иконки, Gradle
 ```
+
+Игра и правила одни и те же на всех платформах: различается только точка входа
+(`cmd/pyatimirye` для компьютера и браузера, `mobile` для телефонов) и способ ввода.
+Касания превращаются в ту же 6-битную маску `sim.Input`, что и клавиатура, поэтому
+рекорды, повторы и призраки работают одинаково везде.
 
 ```
  клавиатура/геймпад ──► game.readPlayInput ──► sim.Input (6 бит)
@@ -162,9 +208,11 @@ internal/assets/     встроенные ресурсы (иконка)
 - [x] Ядро: шахта, 8 уровней, 3 сложности, опасности, способности
 - [x] Таблицы рекордов, призрак, испытание дня, проверка записей
 - [ ] Остальные четыре мира со своими героями и способностями (лес, храм, передовая, космос)
+- [x] Кросс-платформенность: Windows, Linux, macOS, браузер, Android, iOS; сенсорное управление
 - [ ] Дуэль вдвоём на одном экране (WASD против стрелок)
 - [ ] Переназначение клавиш, настройки графики, достижения
 - [ ] Steamworks: достижения и онлайн-таблицы, сборка для Steam Deck (Linux)
+- [ ] Публикация: Google Play (подпись релиза), App Store, веб-версия на GitHub Pages
 
 ## Лицензии
 
