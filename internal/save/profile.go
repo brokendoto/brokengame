@@ -18,6 +18,8 @@ type Profile struct {
 	Shake      bool           `json:"shake"`  // тряска экрана и вспышки
 	// Keys — переназначенные клавиши: "solo.dash" → ["Space", "ShiftLeft"].
 	Keys map[string][]string `json:"keys,omitempty"`
+	// Achievements: идентификатор достижения → дата получения.
+	Achievements map[string]string `json:"achievements"`
 	// Unlocked: "mine-normal" → номер последнего открытого уровня.
 	Unlocked map[string]int `json:"unlocked"`
 	// Medals: ключ трассы → лучшая медаль.
@@ -35,6 +37,9 @@ func LoadProfile(dir string) *Profile {
 	_ = readJSON(p.path, p)
 	if p.Unlocked == nil {
 		p.Unlocked = map[string]int{}
+	}
+	if p.Achievements == nil {
+		p.Achievements = map[string]string{}
 	}
 	if p.Medals == nil {
 		p.Medals = map[string]sim.Medal{}

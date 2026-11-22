@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/achieve"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
@@ -37,6 +38,9 @@ type App struct {
 	quit   bool
 	toast  string
 	toastT int
+
+	achQueue []achieve.ID // достижения, которые ещё надо показать
+	achT     int
 
 	// Дуэль: счёт матчей за сеанс и последний выбранный уровень.
 	duelWins  [2]int
@@ -106,6 +110,12 @@ func (a *App) Update() error {
 	if a.toastT > 0 {
 		a.toastT--
 	}
+	if len(a.achQueue) > 0 {
+		a.achT++
+		if a.achT > achShowTicks {
+			a.achQueue, a.achT = a.achQueue[1:], 0
+		}
+	}
 	if a.next != nil {
 		a.fade += 0.12
 		if a.fade >= 1 {
@@ -135,6 +145,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 	if a.fade > 0 {
 		fillRect(screen, 0, 0, ScreenW, ScreenH, withAlpha(rgba(8, 6, 12, 255), a.fade))
 	}
+	a.drawAchievementPopup(screen)
 }
 
 // Layout задаёт логическое разрешение.

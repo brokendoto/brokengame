@@ -7,6 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/achieve"
 	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
@@ -287,6 +288,9 @@ func (s *duelScene) Update(a *App) {
 	if s.d.Over {
 		a.duelWins[0] += b2i(s.d.Winner == 0)
 		a.duelWins[1] += b2i(s.d.Winner == 1)
+		if s.d.Winner >= 0 && s.bots == 0 {
+			a.Grant(achieve.DuelWin)
+		}
 	}
 }
 

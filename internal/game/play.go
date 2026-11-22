@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/achieve"
 	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/replay"
 	"github.com/brokendoto/brokengame/internal/save"
@@ -44,6 +45,10 @@ type playScene struct {
 	hits      hits
 	banner    string
 	bannerT   int
+
+	// Счётчики для достижений.
+	goldenGot, cursedGot int
+	holeHit              bool
 }
 
 func newPlayScene(a *App, t sim.Track) *playScene {
@@ -84,6 +89,7 @@ func (s *playScene) Update(a *App) {
 		s.autopilot = !s.autopilot
 		if s.autopilot {
 			a.Toast("Автопилот включён: результат запишется на имя «Бот»")
+			a.Grant(achieve.Robot)
 		}
 	}
 	if s.countdown > 0 {
@@ -147,6 +153,19 @@ func (s *playScene) Update(a *App) {
 }
 
 func (s *playScene) handleEvents(a *App) {
+	for _, e := range s.st.Events {
+		switch e.Kind {
+		case sim.EvGolden:
+			s.goldenGot++
+		case sim.EvCursed:
+			s.cursedGot++
+		case sim.EvHole:
+			s.holeHit = true
+			if !s.usedBot {
+				a.Grant(achieve.EventHoriz)
+			}
+		}
+	}
 	eventFX(a, s.fx, s.track.World, s.st.Events, false, func(t string) { s.banner, s.bannerT = t, 120 })
 }
 
