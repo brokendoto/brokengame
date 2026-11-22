@@ -1,0 +1,14 @@
+"AppBuild"
+{
+	// Замените 480 на AppID игры, а 481/482 — на номера депо из Steamworks.
+	"AppID" "480"
+	"Desc" "Pyatimirye build"
+	"ContentRoot" "../content/"
+	"BuildOutput" "../output/"
+	"SetLive" ""
+	"Depots"
+	{
+		"481" "depot_windows.vdf"
+		"482" "depot_linux.vdf"
+	}
+}

@@ -1,0 +1,11 @@
+"DepotBuild"
+{
+	// Linux-депо запускается и на Steam Deck (SteamOS).
+	"DepotID" "482"
+	"FileMapping"
+	{
+		"LocalPath" "linux/*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+}
