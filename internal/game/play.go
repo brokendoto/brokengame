@@ -39,6 +39,8 @@ type playScene struct {
 	trail     [][2]float64
 	usedBot   bool
 	autopilot bool // F9: бот ведёт шахтёра (для демонстрации алгоритма)
+	touch     touchControls
+	hits      hits
 	banner    string
 	bannerT   int
 }
@@ -69,6 +71,7 @@ func newPlayScene(a *App, t sim.Track) *playScene {
 
 func (s *playScene) Update(a *App) {
 	s.fx.update()
+	touchIn := s.touch.update(a.Pointer)
 	if s.bannerT > 0 {
 		s.bannerT--
 	}
@@ -90,14 +93,14 @@ func (s *playScene) Update(a *App) {
 		if s.countdown == 0 {
 			a.Sound.Play(sfx.Go)
 		}
-		if pausePressed() {
+		if pausePressed() || s.touch.pauseTap {
 			s.paused = true
 		}
 		return
 	}
 	if s.st.Status != sim.Playing {
 		s.endT++
-		if s.endT > 80 || (s.endT > 20 && okPressed()) {
+		if s.endT > 80 || (s.endT > 20 && (okPressed() || a.Pointer.tapped)) {
 			a.Goto(newResultScene(a, s))
 		}
 		if retryPressed() {
@@ -109,12 +112,12 @@ func (s *playScene) Update(a *App) {
 		a.Goto(newPlayScene(a, s.track))
 		return
 	}
-	if pausePressed() {
+	if pausePressed() || s.touch.pauseTap {
 		s.paused, s.pauseSel = true, 0
 		return
 	}
 
-	in := readPlayInput()
+	in := readPlayInput() | touchIn
 	if s.autopilot {
 		in = sim.Autopilot(s.st)
 		s.usedBot = true
@@ -208,7 +211,11 @@ func (s *playScene) updatePause(a *App) {
 		s.paused = false
 		return
 	}
-	if okPressed() {
+	activate := okPressed()
+	if id, ok := s.hits.tapped(a); ok {
+		s.pauseSel, activate = id, true
+	}
+	if activate {
 		a.Sound.Play(sfx.Select)
 		switch s.pauseSel {
 		case 0:
@@ -229,6 +236,12 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 	}
 	s.view.drawWorld(dst, s.st, ghost, a.Frame, s.fx, s.trail, s.ghostEntry.Name)
 	s.drawHUD(a, dst)
+	if a.Pointer.touchMode && s.st.Status == sim.Playing && !s.paused {
+		s.touch.draw(dst, s.st.P.DashCD, s.st.P.AbilityCD)
+		// Значок паузы: нажатие на верхнюю панель ставит игру на паузу.
+		fillRect(dst, 580, 18, 6, 20, withAlpha(colDim, 0.7))
+		fillRect(dst, 591, 18, 6, 20, withAlpha(colDim, 0.7))
+	}
 
 	if s.countdown > 0 {
 		n := s.countdown/sim.TPS + 1
@@ -258,7 +271,9 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 		fillRect(dst, 0, 0, ScreenW, ScreenH, rgba(0, 0, 0, 160))
 		drawPanel(dst, ScreenW/2-200, 220, 400, 260)
 		drawText(dst, "Пауза", 36, true, ScreenW/2, 240, Center, colText)
+		s.hits.reset()
 		for i, it := range pauseItems {
+			s.hits.add(rect{ScreenW/2 - 160, 305 + float64(i)*52, 320, 48}, i)
 			c := colDim
 			if i == s.pauseSel {
 				c = colAccent
@@ -331,8 +346,12 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	drawText(dst, fmtScore(st.ItemScore), 30, true, 900, 30, Left, colText)
 
 	// Способности.
-	chip(dst, 1040, 42, "Рывок", "Space", st.P.DashCD, sim.DashCooldown, rgba(255, 190, 90, 255))
-	chip(dst, 1160, 42, "Щит", "E", st.P.AbilityCD, sim.ShieldCD, colAccent)
+	dashKey, shieldKey := "Space", "E"
+	if a.Pointer.touchMode {
+		dashKey, shieldKey = "", ""
+	}
+	chip(dst, 1040, 42, "Рывок", dashKey, st.P.DashCD, sim.DashCooldown, rgba(255, 190, 90, 255))
+	chip(dst, 1160, 42, "Щит", shieldKey, st.P.AbilityCD, sim.ShieldCD, colAccent)
 
 	// Призрак.
 	if s.ghost != nil {
