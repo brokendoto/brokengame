@@ -8,6 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/achieve"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
 	"github.com/brokendoto/brokengame/internal/sim"
@@ -24,6 +25,7 @@ const (
 	miRecords
 	miDiff
 	miPlayer
+	miAchievements
 	miSettings
 	miQuit
 )
@@ -37,7 +39,7 @@ type menuScene struct {
 }
 
 func newMenuScene() *menuScene {
-	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miDiff, miPlayer, miSettings}}
+	m := &menuScene{items: []menuItem{miCampaign, miDaily, miDuel, miRecords, miAchievements, miDiff, miPlayer, miSettings}}
 	if CanQuit() {
 		m.items = append(m.items, miQuit)
 	}
@@ -58,6 +60,8 @@ func (m *menuScene) label(a *App, it menuItem) string {
 		return "Сложность:  ‹ " + sim.Difficulties[a.Prof.Diff].Name + " ›"
 	case miPlayer:
 		return "Игрок: " + a.Prof.Name
+	case miAchievements:
+		return "Достижения: " + itoa(len(a.Prof.Achievements)) + " из " + itoa(len(achieve.List))
 	case miSettings:
 		return "Настройки"
 	case miQuit:
@@ -117,6 +121,8 @@ func (m *menuScene) Update(a *App) {
 		_ = a.Prof.Save()
 	case miPlayer:
 		a.Goto(newNameScene(false))
+	case miAchievements:
+		a.Goto(newAchievementsScene())
 	case miSettings:
 		a.Goto(newSettingsScene())
 	case miQuit:
@@ -175,7 +181,7 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	} else {
 		keyHint(dst, "↑↓ — выбор   ·   Enter — ок   ·   ←→ — сложность   ·   F11 — полный экран   ·   M — звук")
 	}
-	drawText(dst, "v0.5 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
+	drawText(dst, "v0.6 · Go + Ebitengine", 14, false, ScreenW-16, ScreenH-24, Right, rgba(90, 84, 100, 255))
 }
 
 // --- Выбор уровня ------------------------------------------------------------
