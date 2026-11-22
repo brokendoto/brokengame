@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/replay"
 	"github.com/brokendoto/brokengame/internal/save"
 	"github.com/brokendoto/brokengame/internal/sfx"
@@ -310,7 +311,7 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 		goal := "Собери все " + sim.Worlds[w].ItemsPl + " (" + itoa(len(s.lv.Items)) + ") и доберись до выхода"
 		drawTextShadow(dst, goal, 18, false, ScreenW/2, ScreenH/2+104, Center, colDim)
 		ab := sim.Abilities[s.lv.Rules().Ability]
-		key := "E"
+		key := hintKey(controls.Solo, controls.Ability)
 		if a.Pointer.touchMode {
 			key = "кнопка"
 		}
@@ -410,7 +411,7 @@ func (s *playScene) drawHUD(a *App, dst *ebiten.Image) {
 	drawText(dst, fmtScore(st.ItemScore), 30, true, 900, 30, Left, colText)
 
 	// Способности.
-	dashKey, abKey := "Space", "E"
+	dashKey, abKey := hintKey(controls.Solo, controls.Dash), hintKey(controls.Solo, controls.Ability)
 	if a.Pointer.touchMode {
 		dashKey, abKey = "", ""
 	}
@@ -457,7 +458,11 @@ func chip(dst *ebiten.Image, x, y float64, name, key string, cd, max int, c rgba
 		drawText(dst, itoa(cd/sim.TPS+1), 18, true, x, y-11, Center, colDim)
 	} else {
 		fillCircle(dst, x, y, r, withAlpha(c, 0.85))
-		drawText(dst, key, 14, true, x, y-9, Center, rgba(20, 16, 24, 255))
+		size := 14
+		for size > 9 && textWidth(key, size, true) > 2*r-6 {
+			size--
+		}
+		drawText(dst, key, size, true, x, y-float64(size)*0.62, Center, rgba(20, 16, 24, 255))
 	}
 	drawText(dst, name, 13, false, x+r+6, y-8, Left, colDim)
 }
