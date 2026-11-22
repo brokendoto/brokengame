@@ -29,15 +29,21 @@ type App struct {
 	Rec     *save.Records
 	Sound   *sfx.Bank
 	Frame   int
+	Pointer *pointer
 
-	scene    Scene
-	next     Scene
-	fade     float64
-	quit     bool
-	toast    string
-	toastT   int
-	bgDust   []dust
-	Headless bool // без окна (для скриншотов и тестов)
+	scene  Scene
+	next   Scene
+	fade   float64
+	quit   bool
+	toast  string
+	toastT int
+
+	// Дуэль: счёт матчей за сеанс и последний выбранный уровень.
+	duelWins  [2]int
+	duelWorld sim.World
+	duelLevel int
+	bgDust    []dust
+	Headless  bool // без окна (для скриншотов и тестов)
 }
 
 type dust struct{ x, y, vx, vy, r, phase float64 }
@@ -46,9 +52,10 @@ type dust struct{ x, y, vx, vy, r, phase float64 }
 func New() *App {
 	dir := save.Dir()
 	a := &App{
-		Prof:  save.LoadProfile(dir),
-		Rec:   save.LoadRecords(dir),
-		Sound: sfx.NewBank(),
+		Prof:    save.LoadProfile(dir),
+		Rec:     save.LoadRecords(dir),
+		Sound:   sfx.NewBank(),
+		Pointer: newPointer(),
 	}
 	a.Records = a.Rec
 	a.Sound.Muted = a.Prof.Muted
@@ -79,6 +86,7 @@ func (a *App) Toast(s string) { a.toast, a.toastT = s, 150 }
 // Update вызывается Ebitengine 60 раз в секунду.
 func (a *App) Update() error {
 	a.Frame++
+	a.Pointer.update()
 	if inpututil.IsKeyJustPressed(ebiten.KeyF11) ||
 		(inpututil.IsKeyJustPressed(ebiten.KeyEnter) && ebiten.IsKeyPressed(ebiten.KeyAlt)) {
 		a.SetFullscreen(!ebiten.IsFullscreen())
@@ -135,7 +143,7 @@ func (a *App) Layout(int, int) (int, int) { return ScreenW, ScreenH }
 func (a *App) Quit() { a.quit = true }
 
 // CanQuit — есть ли смысл в пункте «Выход» (в браузере его нет).
-func CanQuit() bool { return runtime.GOOS != "js" }
+func CanQuit() bool { return runtime.GOOS != "js" && !IsMobile() }
 
 // SetFullscreen переключает полноэкранный режим и запоминает выбор.
 func (a *App) SetFullscreen(on bool) {

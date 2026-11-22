@@ -11,7 +11,7 @@ import "fmt"
 
 // Version меняется при любом изменении правил, влияющем на результат.
 // Записи забегов старых версий не используются как призраки.
-const Version = 1
+const Version = 2
 
 const (
 	TPS = 60 // шагов симуляции в секунду
@@ -70,16 +70,16 @@ const (
 
 // WorldInfo — описание мира для меню.
 type WorldInfo struct {
-	ID, Name, Hero, Item, ItemsGen string
-	Ready                          bool
+	ID, Name, Hero, Item, ItemsGen, ItemsPl string
+	Ready                                   bool
 }
 
 var Worlds = [WorldCount]WorldInfo{
-	{ID: "mine", Name: "Кристальная шахта", Hero: "Шахтёр", Item: "кристалл", ItemsGen: "кристаллов", Ready: true},
-	{ID: "forest", Name: "Осенний лес", Hero: "Белочка", Item: "жёлудь", ItemsGen: "желудей"},
-	{ID: "temple", Name: "Ночной храм", Hero: "Ронин", Item: "душа", ItemsGen: "душ"},
-	{ID: "front", Name: "Руины передовой", Hero: "Пилот", Item: "энергоядро", ItemsGen: "энергоядер"},
-	{ID: "space", Name: "Открытый космос", Hero: "Космонавт", Item: "звезда", ItemsGen: "звёзд"},
+	{ID: "mine", Name: "Кристальная шахта", Hero: "Шахтёр", Item: "кристалл", ItemsGen: "кристаллов", ItemsPl: "кристаллы", Ready: true},
+	{ID: "forest", Name: "Осенний лес", Hero: "Белочка", Item: "жёлудь", ItemsGen: "желудей", ItemsPl: "жёлуди", Ready: true},
+	{ID: "temple", Name: "Ночной храм", Hero: "Ронин", Item: "душа", ItemsGen: "душ", ItemsPl: "души", Ready: true},
+	{ID: "front", Name: "Руины передовой", Hero: "Пилот", Item: "энергоядро", ItemsGen: "энергоядер", ItemsPl: "энергоядра", Ready: true},
+	{ID: "space", Name: "Открытый космос", Hero: "Космонавт", Item: "звезда", ItemsGen: "звёзд", ItemsPl: "звёзды", Ready: true},
 }
 
 // LevelsPerWorld — число уровней кампании в каждом мире.
@@ -119,14 +119,9 @@ func (t Track) Seed() uint64 {
 // Title — человекочитаемое название трассы.
 func (t Track) Title() string {
 	if t.Daily != "" {
-		return "Испытание дня " + t.Daily
+		return "Испытание дня " + t.Daily + " · " + Worlds[t.World].Name
 	}
 	return fmt.Sprintf("%s · уровень %d · %s", Worlds[t.World].Name, t.Level, Difficulties[t.Diff].Name)
-}
-
-// DailyTrack возвращает трассу испытания дня для даты ГГГГ-ММ-ДД.
-func DailyTrack(date string) Track {
-	return Track{World: Mine, Level: DailyLevel, Diff: Normal, Daily: date}
 }
 
 // Pt — клетка поля.
@@ -138,7 +133,9 @@ type Cell uint8
 const (
 	Floor Cell = iota
 	Wall
-	Mud
+	Mud // замедляет (грязь, лужи)
+	Fog // управление наоборот (туман)
+	Ice // скольжение (масло, невесомость)
 )
 
 // Medal — награда за прохождение уровня.

@@ -9,7 +9,7 @@ func Generate(t Track) *Level {
 	if t.Daily != "" {
 		level = DailyLevel
 	}
-	cfg := ConfigFor(level, t.Diff)
+	cfg := ConfigFor(t.World, level, t.Diff)
 	rng := NewRNG(t.Seed())
 	for attempt := 0; attempt < 400; attempt++ {
 		if lv := tryGenerate(&rng, t, cfg); lv != nil {
@@ -142,10 +142,14 @@ func tryGenerate(rng *RNG, t Track, cfg LevelConfig) *Level {
 		return nil
 	}
 
-	// 5. Грязь — пятна, замедляющие и игрока, и врагов.
-	for i := 0; i < cfg.MudBlobs; i++ {
+	// 5. Зоны мира: грязь/лужи замедляют, туман путает управление, лёд скользкий.
+	zone := WorldRules[t.World].Zone
+	for i := 0; i < cfg.ZoneBlobs; i++ {
 		c := cand[rng.Intn(len(cand))]
 		r := 1 + rng.Intn(2)
+		if zone != Mud {
+			r++
+		}
 		for y := c.Y - r; y <= c.Y+r; y++ {
 			for x := c.X - r; x <= c.X+r; x++ {
 				dx, dy := x-c.X, y-c.Y
@@ -156,7 +160,7 @@ func tryGenerate(rng *RNG, t Track, cfg LevelConfig) *Level {
 					dy = -dy
 				}
 				if dx+dy <= r && lv.CellAt(x, y) == Floor && dist[y][x] >= 2 {
-					lv.Grid[y][x] = Mud
+					lv.Grid[y][x] = zone
 				}
 			}
 		}
@@ -193,8 +197,8 @@ func tryGenerate(rng *RNG, t Track, cfg LevelConfig) *Level {
 			continue
 		}
 		kind := ChaserBasic
-		if len(lv.Chasers) >= cfg.Chasers-cfg.Cunning {
-			kind = ChaserCunning
+		if len(lv.Chasers) >= cfg.Chasers-cfg.Special {
+			kind = WorldRules[t.World].Special
 		}
 		lv.Chasers = append(lv.Chasers, ChaserSpawn{P: p, Kind: kind})
 		used[p] = true
@@ -203,7 +207,59 @@ func tryGenerate(rng *RNG, t Track, cfg LevelConfig) *Level {
 		return nil
 	}
 
-	// 8. Аптечка.
+	// 8. Чёрные дыры — подальше от старта, выхода и кристаллов.
+	for _, p := range cand {
+		if len(lv.Holes) == cfg.BlackHoles {
+			break
+		}
+		if used[p] || dist[p.Y][p.X] < 7 || cheb(p, lv.Exit) < 4 || lv.Grid[p.Y][p.X] == Wall {
+			continue
+		}
+		ok := true
+		for _, it := range lv.Items {
+			if cheb(p, it) < 2 {
+				ok = false
+			}
+		}
+		for _, h := range lv.Holes {
+			if cheb(p, h) < 6 {
+				ok = false
+			}
+		}
+		if ok {
+			lv.Holes = append(lv.Holes, p)
+			used[p] = true
+		}
+	}
+
+	// 9. Проклятые предметы — рядом с настоящими, чтобы приходилось обходить.
+	for _, it := range lv.Items {
+		if len(lv.Cursed) == cfg.Cursed {
+			break
+		}
+		for _, dv := range dirs {
+			p := Pt{it.X + dv.X*2, it.Y + dv.Y*2}
+			q := Pt{it.X + dv.X, it.Y + dv.Y}
+			if lv.CellAt(p.X, p.Y) != Wall && dist[p.Y][p.X] >= 3 && !used[p] && !used[q] && p != lv.Exit {
+				lv.Cursed = append(lv.Cursed, p)
+				used[p] = true
+				break
+			}
+		}
+	}
+
+	// 10. Исчезающие бонусные предметы.
+	for _, p := range cand {
+		if len(lv.Golden) == cfg.Golden {
+			break
+		}
+		if !used[p] && dist[p.Y][p.X] >= 5 && lv.Grid[p.Y][p.X] != Wall {
+			lv.Golden = append(lv.Golden, p)
+			used[p] = true
+		}
+	}
+
+	// 11. Аптечка.
 	if cfg.Heart {
 		for _, p := range cand {
 			if !used[p] && dist[p.Y][p.X] >= 6 {

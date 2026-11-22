@@ -12,8 +12,19 @@ import (
 	"sync"
 )
 
+var dirOverride string
+
+// SetDir задаёт папку сохранений явно. На Android её передаёт Java-код
+// (внутренняя папка приложения), потому что стандартной папки настроек там нет.
+func SetDir(dir string) { dirOverride = dir }
+
 // Dir возвращает папку сохранений или "" если её нет.
 func Dir() string {
+	if dirOverride != "" {
+		if err := os.MkdirAll(dirOverride, 0o755); err == nil {
+			return dirOverride
+		}
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return ""
