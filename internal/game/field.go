@@ -10,8 +10,8 @@ import (
 	"github.com/brokendoto/brokengame/internal/sim"
 )
 
-// Отрисовка мира «Кристальная шахта». Вся графика процедурная (векторные
-// фигуры и градиенты), картинок-спрайтов нет — как и в оригинале.
+// Отрисовка поля. Вся графика процедурная (векторные фигуры и градиенты),
+// картинок-спрайтов нет — как и в оригинале. Оформление миров — в themes.go.
 
 const (
 	CellPx = 48
@@ -24,15 +24,8 @@ const (
 func px(x float64) float64 { return FieldX + x*CellPx }
 func py(y float64) float64 { return FieldY + y*CellPx }
 
-// Цвета шахты.
+// Цвета кристалла шахты.
 var (
-	mineFloorA  = rgba(46, 38, 34, 255)
-	mineFloorB  = rgba(38, 31, 29, 255)
-	mineWall    = rgba(84, 72, 64, 255)
-	mineWallHi  = rgba(122, 106, 92, 255)
-	mineWallLo  = rgba(52, 43, 38, 255)
-	mineMud     = rgba(78, 52, 30, 255)
-	mineMudHi   = rgba(110, 78, 48, 255)
 	crystalBody = rgba(90, 220, 255, 255)
 	crystalHi   = rgba(210, 250, 255, 255)
 	crystalLo   = rgba(40, 130, 200, 255)
@@ -44,15 +37,16 @@ func cellHash(x, y, k int) uint64 {
 	return r.Next()
 }
 
-// fieldView — отрисовщик уровня; статичная часть (пол, стены, грязь)
+// fieldView — отрисовщик уровня; статичная часть (пол, стены, зоны)
 // рисуется один раз в отдельную картинку.
 type fieldView struct {
 	lv     *sim.Level
+	w      sim.World
 	static *ebiten.Image
 }
 
 func newFieldView(lv *sim.Level) *fieldView {
-	f := &fieldView{lv: lv, static: ebiten.NewImage(FieldW, FieldH)}
+	f := &fieldView{lv: lv, w: lv.Track.World, static: ebiten.NewImage(FieldW, FieldH)}
 	f.renderStatic()
 	return f
 }
@@ -60,71 +54,30 @@ func newFieldView(lv *sim.Level) *fieldView {
 func (f *fieldView) renderStatic() {
 	img := f.static
 	lv := f.lv
-	img.Fill(mineFloorB)
+	img.Fill(themes[f.w].floorB)
 	for y := 0; y < sim.H; y++ {
 		for x := 0; x < sim.W; x++ {
-			X, Y := float64(x*CellPx), float64(y*CellPx)
-			h := cellHash(x, y, 1)
 			switch lv.Grid[y][x] {
+			case sim.Wall:
 			case sim.Floor:
-				c := lerpColor(mineFloorA, mineFloorB, float64(h%100)/100)
-				fillRect(img, X, Y, CellPx, CellPx, c)
-				for i := 0; i < 3; i++ {
-					hh := cellHash(x, y, 10+i)
-					fillCircle(img, X+float64(hh%40)+4, Y+float64(hh/40%40)+4, 1.2+float64(hh%3)*0.6, rgba(60, 51, 46, 255))
-				}
-			case sim.Mud:
-				fillRect(img, X, Y, CellPx, CellPx, mineMud)
-				for i := 0; i < 4; i++ {
-					hh := cellHash(x, y, 20+i)
-					fillCircle(img, X+float64(hh%36)+6, Y+float64(hh/36%36)+6, 3+float64(hh%4), rgba(64, 42, 24, 255))
-				}
-				hh := cellHash(x, y, 30)
-				line(img, X+8+float64(hh%10), Y+12, X+20+float64(hh%10), Y+10, 2, mineMudHi)
+				renderFloor(img, f.w, x, y)
+			default:
+				renderZone(img, f.w, x, y)
 			}
 		}
 	}
-	// Стены рисуем поверх, с объёмом: свет сверху, тень снизу.
+	// Тени под стенами, потом сами стены.
 	for y := 0; y < sim.H; y++ {
 		for x := 0; x < sim.W; x++ {
-			if lv.Grid[y][x] != sim.Wall {
-				continue
-			}
-			X, Y := float64(x*CellPx), float64(y*CellPx)
-			if !lv.Solid(x, y+1) {
-				fillRect(img, X, Y+CellPx, CellPx, 10, rgba(0, 0, 0, 90))
+			if lv.Grid[y][x] == sim.Wall && !lv.Solid(x, y+1) {
+				fillRect(img, float64(x*CellPx), float64((y+1)*CellPx), CellPx, 10, rgba(0, 0, 0, 90))
 			}
 		}
 	}
 	for y := 0; y < sim.H; y++ {
 		for x := 0; x < sim.W; x++ {
-			if lv.Grid[y][x] != sim.Wall {
-				continue
-			}
-			X, Y := float64(x*CellPx), float64(y*CellPx)
-			h := cellHash(x, y, 2)
-			fillRect(img, X, Y, CellPx, CellPx, lerpColor(mineWall, mineWallLo, float64(h%30)/100))
-			up, down := lv.Solid(x, y-1) && y > 0, lv.Solid(x, y+1) && y < sim.H-1
-			left, right := lv.Solid(x-1, y) && x > 0, lv.Solid(x+1, y) && x < sim.W-1
-			if !up {
-				fillRect(img, X, Y, CellPx, 7, mineWallHi)
-			}
-			if !down {
-				fillRect(img, X, Y+CellPx-8, CellPx, 8, mineWallLo)
-			}
-			if !left {
-				fillRect(img, X, Y, 4, CellPx, rgba(100, 86, 76, 255))
-			}
-			if !right {
-				fillRect(img, X+CellPx-4, Y, 4, CellPx, rgba(62, 52, 46, 255))
-			}
-			// Трещины и вкрапления породы.
-			cx, cy := X+float64(h%28)+10, Y+float64(h/28%22)+12
-			line(img, cx, cy, cx+8, cy+6, 1.5, rgba(48, 40, 35, 255))
-			line(img, cx+8, cy+6, cx+5, cy+14, 1.5, rgba(48, 40, 35, 255))
-			for i := 0; i < 3; i++ {
-				hh := cellHash(x, y, 40+i)
-				fillCircle(img, X+float64(hh%38)+5, Y+float64(hh/38%34)+8, 1.5, rgba(140, 124, 110, 255))
+			if lv.Grid[y][x] == sim.Wall {
+				renderWall(img, lv, f.w, x, y)
 			}
 		}
 	}
@@ -139,41 +92,89 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 
 	field := dst.SubImage(image.Rect(FieldX, FieldY, FieldX+FieldW, FieldY+FieldH)).(*ebiten.Image)
 	t := float64(frame)
+	w := f.w
+	th := &themes[w]
+	cpx := func(p sim.Pt) (float64, float64) { return px(float64(p.X)+0.5) + ox, py(float64(p.Y)+0.5) + oy }
 
-	// Шипы.
-	for _, sp := range f.lv.Spikes {
-		f.drawSpikes(field, st, sp, ox, oy)
+	// Чёрные дыры — под всем остальным.
+	for _, h := range f.lv.Holes {
+		x, y := cpx(h)
+		drawHole(field, x, y, t)
 	}
-	// Выход.
+	// Шипы/мины.
+	for _, sp := range f.lv.Spikes {
+		drawTrap(field, w, px(float64(sp.P.X))+ox, py(float64(sp.P.Y))+oy, st.SpikePhase(sp))
+	}
 	f.drawExit(field, st, t, ox, oy)
-	// Предупреждения обвалов.
+	// Предупреждения обвалов/лучей.
 	for _, c := range st.Caves {
 		f.drawCave(field, c, t, ox, oy)
 	}
-	// Кристаллы и аптечка.
+	// Предметы.
 	for i, it := range st.Items {
 		if it.Taken {
 			continue
 		}
-		x, y := px(float64(it.P.X)+0.5)+ox, py(float64(it.P.Y)+0.5)+oy+math.Sin(t*0.07+float64(i))*2.5
-		drawCrystal(field, x, y, 1, t+float64(i)*10)
+		x, y := cpx(it.P)
+		drawItem(field, w, x, y+math.Sin(t*0.07+float64(i))*2.5, 1, t+float64(i)*10, 0)
+	}
+	for i, it := range st.Cursed {
+		if it.Taken {
+			continue
+		}
+		x, y := cpx(it.P)
+		drawItem(field, w, x, y+math.Sin(t*0.06+float64(i))*2, 0.9, t, 2)
+	}
+	for i, it := range st.Golden {
+		if it.Taken {
+			continue
+		}
+		left := st.GoldenLeft(i)
+		if left < 3*sim.TPS && (frame/5)%2 == 0 {
+			continue
+		}
+		x, y := cpx(it.P)
+		s := 1.05 + 0.08*math.Sin(t*0.2)
+		drawItem(field, w, x, y+math.Sin(t*0.08)*2.5, s, t, 1)
+		// Кольцо-таймер: сколько осталось жить бонусу.
+		k := math.Min(1, float64(left)/float64(sim.GoldenLife))
+		arc := []float64{}
+		for a := 0.0; a <= k*2*math.Pi+0.01; a += 0.2 {
+			arc = append(arc, x+math.Sin(a)*22, y-math.Cos(a)*22)
+		}
+		for j := 0; j+3 < len(arc); j += 2 {
+			line(field, arc[j], arc[j+1], arc[j+2], arc[j+3], 2, withAlpha(colGold, 0.7))
+		}
 	}
 	if f.lv.HasHeart && !st.HeartTaken {
-		x, y := px(float64(f.lv.Heart.X)+0.5)+ox, py(float64(f.lv.Heart.Y)+0.5)+oy
+		x, y := cpx(f.lv.Heart)
 		drawHeart(field, x, y+math.Sin(t*0.09)*2, 1+0.08*math.Sin(t*0.15), rgba(255, 80, 100, 255))
 	}
-	// Валуны.
+	// Катящиеся объекты.
 	for _, r := range st.Rocks {
-		f.drawRock(field, r, t, ox, oy)
+		if r.Warn > 0 {
+			drawRockWarn(field, r, ox, oy)
+			continue
+		}
+		drawRolling(field, w, r, px(r.X)+ox, py(r.Y)+oy)
 	}
-	// Жуки.
+	// Метки, куда прыгнет призрак.
 	for _, c := range st.Chasers {
-		drawBeetle(field, c, t, ox, oy, st)
+		if c.BlinkWarn > 0 {
+			x, y := px(float64(c.BX)+0.5)+ox, py(float64(c.BY)+0.5)+oy
+			k := float64(c.BlinkWarn) / sim.PhantomWarn
+			strokeCircle(field, x, y, 8+16*k, 3, withAlpha(th.eyeSpecial, 0.9-0.5*k))
+			fillCircle(field, x, y, 5, withAlpha(th.eyeSpecial, 0.6))
+		}
 	}
-	// Призрак.
+	// Враги.
+	for _, c := range st.Chasers {
+		drawEnemy(field, w, c, t, ox, oy, st)
+	}
+	// Призрак лучшего забега.
 	if ghost != nil {
 		gx, gy := px(ghost.P.X)+ox, py(ghost.P.Y)+oy
-		drawMiner(field, ghost.P, gx, gy, t, 0.38, true)
+		drawHero(field, w, ghost.P, gx, gy, t, 0.38, true)
 		if ghostName != "" {
 			drawText(field, ghostName, 13, false, gx, gy-36, Center, rgba(200, 230, 255, 160))
 		}
@@ -185,56 +186,153 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 	}
 	// Игрок (мигает после удара).
 	p := st.P
+	pxp, pyp := px(p.X)+ox, py(p.Y)+oy
+	if p.MagnetT > 0 {
+		a := 0.25
+		if p.MagnetT < 60 && (p.MagnetT/6)%2 == 0 {
+			a = 0.1
+		}
+		strokeCircle(field, pxp, pyp, sim.MagnetRadius*CellPx, 2, withAlpha(abilityColor(sim.AbMagnet), a))
+		fillCircle(field, pxp, pyp, sim.MagnetRadius*CellPx, withAlpha(abilityColor(sim.AbMagnet), a*0.15))
+	}
 	if p.Invuln == 0 || (frame/4)%2 == 0 {
-		drawMiner(field, p, px(p.X)+ox, py(p.Y)+oy, t, 1, false)
+		drawHero(field, w, p, pxp, pyp, t, 1, false)
 	}
 	fx.draw(field, 0, 0)
 
-	// Темнота шахты: светло только вокруг фонаря шахтёра.
-	lx, ly := px(p.X)+ox+p.FX*18, py(p.Y)+oy+p.FY*18
-	dop := &ebiten.DrawImageOptions{}
-	scale := 2800.0 / 256
-	dop.GeoM.Translate(-128, -128)
-	dop.GeoM.Scale(scale, scale)
-	dop.GeoM.Translate(lx, ly)
-	dop.ColorScale.ScaleAlpha(0.62)
-	dop.Filter = ebiten.FilterLinear
-	field.DrawImage(darkImg, dop)
+	// Туман храма — поверх всего, что в нём.
+	if w == sim.Temple {
+		for y := 0; y < sim.H; y++ {
+			for x := 0; x < sim.W; x++ {
+				if f.lv.Grid[y][x] != sim.Fog {
+					continue
+				}
+				X, Y := px(float64(x))+ox, py(float64(y))+oy
+				for i := 0; i < 3; i++ {
+					hh := cellHash(x, y, 70+i)
+					cx := X + float64(hh%32) + 8 + math.Sin(t*0.02+float64(hh%7))*6
+					cy := Y + float64(hh/32%32) + 8
+					fillCircle(field, cx, cy, 16+float64(hh%6), withAlpha(th.zoneHi, 0.16))
+				}
+			}
+		}
+	}
+
+	// Темнота: светло только вокруг героя.
+	lx, ly := pxp+p.FX*18, pyp+p.FY*18
+	if th.darkness > 0 {
+		dop := &ebiten.DrawImageOptions{}
+		scale := 2800.0 / 256
+		dop.GeoM.Translate(-128, -128)
+		dop.GeoM.Scale(scale, scale)
+		dop.GeoM.Translate(lx, ly)
+		dop.ColorScale.ScaleAlpha(float32(th.darkness))
+		dop.Filter = ebiten.FilterLinear
+		field.DrawImage(darkImg, dop)
+	}
+	// Стоп-время: мир становится сиреневым.
+	if st.FreezeT > 0 {
+		a := 0.18
+		if st.FreezeT < 40 {
+			a *= float64(st.FreezeT) / 40
+		}
+		fillRect(field, FieldX, FieldY, FieldW, FieldH, withAlpha(abilityColor(sim.AbTimeStop), a))
+	}
 
 	// Светящиеся объекты видны и в темноте.
 	for i, it := range st.Items {
-		if it.Taken {
-			continue
+		if !it.Taken {
+			x, y := cpx(it.P)
+			glow(field, x, y, 34, th.itemGlow, 0.45+0.15*math.Sin(t*0.1+float64(i)))
 		}
-		x, y := px(float64(it.P.X)+0.5)+ox, py(float64(it.P.Y)+0.5)+oy
-		glow(field, x, y, 34, crystalBody, 0.45+0.15*math.Sin(t*0.1+float64(i)))
+	}
+	for _, it := range st.Golden {
+		if !it.Taken {
+			x, y := cpx(it.P)
+			glow(field, x, y, 40, colGold, 0.5)
+		}
+	}
+	for _, it := range st.Cursed {
+		if !it.Taken {
+			x, y := cpx(it.P)
+			glow(field, x, y, 30, rgba(255, 60, 140, 255), 0.35)
+		}
+	}
+	for _, h := range f.lv.Holes {
+		x, y := cpx(h)
+		glow(field, x, y, 60, rgba(170, 90, 255, 255), 0.35)
 	}
 	if st.ExitOpen {
-		glow(field, px(float64(f.lv.Exit.X)+0.5)+ox, py(float64(f.lv.Exit.Y)+0.5)+oy, 80, exitGlow, 0.6+0.2*math.Sin(t*0.12))
+		x, y := cpx(f.lv.Exit)
+		glow(field, x, y, 80, exitGlow, 0.6+0.2*math.Sin(t*0.12))
 	}
 	for _, c := range st.Chasers {
 		if c.Spawn == 0 {
-			eye := rgba(255, 60, 60, 255)
-			if c.Kind == sim.ChaserCunning {
-				eye = rgba(120, 255, 90, 255)
+			eye := th.eyeBasic
+			if c.Kind != sim.ChaserBasic {
+				eye = th.eyeSpecial
 			}
 			glow(field, px(c.X)+ox, py(c.Y)+oy, 22, eye, 0.5)
 		}
 	}
-	glow(field, lx, ly, 70, rgba(255, 220, 150, 255), 0.18)
+	if th.darkness > 0 {
+		glow(field, lx, ly, 70, th.lampColor, 0.18)
+	}
 	if p.ShieldT > 0 {
-		glow(field, px(p.X)+ox, py(p.Y)+oy, 50, colAccent, 0.35)
+		glow(field, pxp, pyp, 50, colAccent, 0.35)
 	}
 	for _, c := range st.Caves {
 		if c.Warn == 0 {
-			f.drawCaveFall(field, c, t, ox, oy)
+			x, y, bw, bh := caveRect(c, ox, oy)
+			drawBeamActive(field, w, c, x, y, bw, bh, t)
 		}
 	}
 	fx.drawTexts(field, 0, 0)
 	if fx.flash > 0.01 {
 		fillRect(field, FieldX, FieldY, FieldW, FieldH, withAlpha(rgba(200, 30, 30, 255), fx.flash*0.35))
 	}
-	roundRectStroke(dst, FieldX-3, FieldY-3, FieldW+6, FieldH+6, 6, 3, rgba(70, 60, 54, 255))
+	roundRectStroke(dst, FieldX-3, FieldY-3, FieldW+6, FieldH+6, 6, 3, lerpColor(th.wall, th.wallLo, 0.3))
+}
+
+func (f *fieldView) drawExit(dst *ebiten.Image, st *sim.State, t, ox, oy float64) {
+	e := f.lv.Exit
+	X, Y := px(float64(e.X))+ox, py(float64(e.Y))+oy
+	roundRect(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, rgba(20, 16, 14, 255))
+	if !st.ExitOpen {
+		roundRectStroke(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, 3, rgba(110, 96, 84, 255))
+		for i := 0; i < 4; i++ {
+			bx := X + 10 + float64(i)*9.5
+			line(dst, bx, Y+8, bx, Y+CellPx-8, 3, rgba(120, 110, 100, 255))
+		}
+		// Замок.
+		fillRect(dst, X+CellPx/2-7, Y+CellPx/2-2, 14, 12, colGold)
+		strokeCircle(dst, X+CellPx/2, Y+CellPx/2-3, 5, 2.5, colGold)
+		return
+	}
+	k := 0.5 + 0.5*math.Sin(t*0.12)
+	roundRect(dst, X+6, Y+6, CellPx-12, CellPx-12, 6, lerpColor(rgba(40, 140, 100, 255), exitGlow, k*0.5))
+	roundRectStroke(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, 3, exitGlow)
+	drawExitGlyph(dst, f.w, X, Y, t)
+}
+
+// drawRockWarn — мигающая стрелка там, откуда сейчас покатится камень.
+func drawRockWarn(dst *ebiten.Image, r sim.Rock, ox, oy float64) {
+	if (r.Warn/6)%2 != 0 {
+		return
+	}
+	X, Y := px(float64(r.Spawn.X)+0.5)+ox, py(float64(r.Spawn.Y)+0.5)+oy
+	dx, dy := float64(r.DX), float64(r.DY)
+	c := rgba(255, 170, 60, 220)
+	fillPoly(dst, []float64{
+		X + dx*14, Y + dy*14,
+		X - dx*6 - dy*12, Y - dy*6 - dx*12,
+		X - dx*6 + dy*12, Y - dy*6 + dx*12,
+	}, c)
+	fillPoly(dst, []float64{
+		X - dx*4, Y - dy*4,
+		X - dx*20 - dy*10, Y - dy*20 - dx*10,
+		X - dx*20 + dy*10, Y - dy*20 + dx*10,
+	}, withAlpha(c, 0.6))
 }
 
 func drawCrystal(dst *ebiten.Image, x, y, s, t float64) {
@@ -362,88 +460,6 @@ func drawBeetle(dst *ebiten.Image, c sim.Chaser, t, ox, oy float64, st *sim.Stat
 	}
 }
 
-func (f *fieldView) drawSpikes(dst *ebiten.Image, st *sim.State, sp sim.SpikeTrap, ox, oy float64) {
-	X, Y := px(float64(sp.P.X))+ox, py(float64(sp.P.Y))+oy
-	ph := st.SpikePhase(sp)
-	roundRect(dst, X+5, Y+5, CellPx-10, CellPx-10, 6, rgba(28, 22, 20, 255))
-	var h float64
-	tip := rgba(170, 165, 160, 255)
-	switch {
-	case ph >= sim.SpikeUpFrom:
-		h = 1
-		tip = rgba(230, 225, 220, 255)
-	case ph >= sim.SpikeWarnFrom:
-		h = 0.25 + 0.1*math.Sin(float64(ph)*1.3)
-		tip = rgba(240, 150, 70, 255)
-	default:
-		h = 0.12
-	}
-	for i := 0; i < 2; i++ {
-		for j := 0; j < 2; j++ {
-			cx, cy := X+15+float64(i)*18, Y+26+float64(j)*14
-			fillPoly(dst, []float64{cx - 6, cy, cx + 6, cy, cx, cy - 4 - 18*h}, tip)
-		}
-	}
-	if ph >= sim.SpikeUpFrom {
-		fillRect(dst, X+5, Y+5, CellPx-10, CellPx-10, rgba(120, 20, 20, 50))
-	}
-}
-
-func (f *fieldView) drawExit(dst *ebiten.Image, st *sim.State, t, ox, oy float64) {
-	e := f.lv.Exit
-	X, Y := px(float64(e.X))+ox, py(float64(e.Y))+oy
-	roundRect(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, rgba(20, 16, 14, 255))
-	if !st.ExitOpen {
-		roundRectStroke(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, 3, rgba(110, 96, 84, 255))
-		for i := 0; i < 4; i++ {
-			bx := X + 10 + float64(i)*9.5
-			line(dst, bx, Y+8, bx, Y+CellPx-8, 3, rgba(120, 110, 100, 255))
-		}
-		// Замок.
-		fillRect(dst, X+CellPx/2-7, Y+CellPx/2-2, 14, 12, colGold)
-		strokeCircle(dst, X+CellPx/2, Y+CellPx/2-3, 5, 2.5, colGold)
-		return
-	}
-	k := 0.5 + 0.5*math.Sin(t*0.12)
-	roundRect(dst, X+6, Y+6, CellPx-12, CellPx-12, 6, lerpColor(rgba(40, 140, 100, 255), exitGlow, k*0.5))
-	roundRectStroke(dst, X+3, Y+3, CellPx-6, CellPx-6, 8, 3, exitGlow)
-	ay := Y + CellPx/2 + math.Sin(t*0.15)*3
-	fillPoly(dst, []float64{X + CellPx/2, ay - 12, X + CellPx/2 + 10, ay + 2, X + CellPx/2 - 10, ay + 2}, rgba(230, 255, 240, 255))
-	fillRect(dst, X+CellPx/2-4, ay+2, 8, 9, rgba(230, 255, 240, 255))
-}
-
-func (f *fieldView) drawRock(dst *ebiten.Image, r sim.Rock, t, ox, oy float64) {
-	if r.Warn > 0 {
-		X, Y := px(float64(r.Spawn.X)+0.5)+ox, py(float64(r.Spawn.Y)+0.5)+oy
-		if (r.Warn/6)%2 == 0 {
-			dx, dy := float64(r.DX), float64(r.DY)
-			c := rgba(255, 170, 60, 220)
-			// Стрелка в сторону движения валуна.
-			fillPoly(dst, []float64{
-				X + dx*14, Y + dy*14,
-				X - dx*6 - dy*12, Y - dy*6 - dx*12,
-				X - dx*6 + dy*12, Y - dy*6 + dx*12,
-			}, c)
-			fillPoly(dst, []float64{
-				X - dx*4, Y - dy*4,
-				X - dx*20 - dy*10, Y - dy*20 - dx*10,
-				X - dx*20 + dy*10, Y - dy*20 + dx*10,
-			}, withAlpha(c, 0.6))
-		}
-		return
-	}
-	x, y := px(r.X)+ox, py(r.Y)+oy
-	rad := sim.RockRadius * CellPx
-	fillCircle(dst, x+3, y+5, rad, rgba(0, 0, 0, 80))
-	fillCircle(dst, x, y, rad+2, rgba(40, 34, 30, 255))
-	fillCircle(dst, x, y, rad, rgba(138, 128, 120, 255))
-	for i := 0; i < 3; i++ {
-		a := r.Angle + float64(i)*2.1
-		fillCircle(dst, x+math.Cos(a)*rad*0.5, y+math.Sin(a)*rad*0.5, rad*0.22, rgba(100, 92, 86, 255))
-	}
-	fillCircle(dst, x-rad*0.35, y-rad*0.4, rad*0.25, rgba(175, 166, 158, 255))
-}
-
 func caveRect(c sim.CaveIn, ox, oy float64) (float64, float64, float64, float64) {
 	if c.Horizontal {
 		return FieldX + ox, py(float64(c.Line)) + oy, FieldW, CellPx
@@ -467,22 +483,5 @@ func (f *fieldView) drawCave(dst *ebiten.Image, c sim.CaveIn, t, ox, oy float64)
 				fillRect(dst, x+w-5, y+i, 3, 12, withAlpha(rgba(255, 170, 60, 255), blink))
 			}
 		}
-	}
-}
-
-func (f *fieldView) drawCaveFall(dst *ebiten.Image, c sim.CaveIn, t, ox, oy float64) {
-	x, y, w, h := caveRect(c, ox, oy)
-	a := float64(c.Active) / sim.CaveHitTicks
-	fillRect(dst, x, y, w, h, withAlpha(rgba(120, 100, 80, 255), 0.75*a))
-	n := int(math.Max(w, h) / 14)
-	for i := 0; i < n; i++ {
-		hh := cellHash(i, c.Line, c.Active)
-		var bx, by float64
-		if c.Horizontal {
-			bx, by = x+float64(i)*14, y+float64(hh%uint64(CellPx))
-		} else {
-			bx, by = x+float64(hh%uint64(CellPx)), y+float64(i)*14
-		}
-		fillRect(dst, bx, by, 6+float64(hh%6), 5+float64(hh%5), withAlpha(rgba(70, 58, 48, 255), a))
 	}
 }

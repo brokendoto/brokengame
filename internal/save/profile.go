@@ -13,6 +13,7 @@ type Profile struct {
 	Muted      bool           `json:"muted"`
 	Fullscreen bool           `json:"fullscreen"`
 	ShowGhost  bool           `json:"show_ghost"`
+	World      sim.World      `json:"world"` // последний выбранный мир
 	// Unlocked: "mine-normal" → номер последнего открытого уровня.
 	Unlocked map[string]int `json:"unlocked"`
 	// Medals: ключ трассы → лучшая медаль.
@@ -36,6 +37,9 @@ func LoadProfile(dir string) *Profile {
 	}
 	if p.Diff < 0 || p.Diff >= sim.DifficultyCount {
 		p.Diff = sim.Normal
+	}
+	if p.World < 0 || p.World >= sim.WorldCount || !p.WorldOpen(p.World) {
+		p.World = sim.Mine
 	}
 	return p
 }
@@ -67,4 +71,22 @@ func (p *Profile) Complete(t sim.Track, m sim.Medal) {
 	if next := t.Level + 1; next <= sim.LevelsPerWorld && next > p.Unlocked[k] {
 		p.Unlocked[k] = next
 	}
+}
+
+// LevelsToUnlockWorld — сколько уровней мира нужно пройти (на любой
+// сложности), чтобы открылся следующий мир.
+const LevelsToUnlockWorld = 4
+
+// WorldOpen — открыт ли мир. Первый открыт всегда, каждый следующий —
+// после LevelsToUnlockWorld пройденных уровней предыдущего.
+func (p *Profile) WorldOpen(w sim.World) bool {
+	if w <= sim.Mine {
+		return true
+	}
+	for d := sim.Difficulty(0); d < sim.DifficultyCount; d++ {
+		if p.UnlockedLevel(w-1, d) > LevelsToUnlockWorld {
+			return true
+		}
+	}
+	return false
 }

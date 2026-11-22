@@ -60,8 +60,14 @@ func newResultScene(a *App, p *playScene) *resultScene {
 			Replay: replay.Encode(p.rec),
 		})
 		if !p.usedBot {
+			next := p.track.World + 1
+			wasOpen := next >= sim.WorldCount || a.Prof.WorldOpen(next)
 			a.Prof.Complete(p.track, r.res.Medal)
 			_ = a.Prof.Save()
+			if !wasOpen && a.Prof.WorldOpen(next) {
+				a.Toast("Открыт новый мир: " + sim.Worlds[next].Name + "!")
+				a.Sound.Play(sfx.ExitOpen)
+			}
 		}
 	}
 	r.top = a.Records.Top(key)
