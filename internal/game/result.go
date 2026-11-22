@@ -5,6 +5,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/brokendoto/brokengame/internal/achieve"
 	"github.com/brokendoto/brokengame/internal/controls"
 	"github.com/brokendoto/brokengame/internal/replay"
 	"github.com/brokendoto/brokengame/internal/save"
@@ -71,6 +72,17 @@ func newResultScene(a *App, p *playScene) *resultScene {
 			}
 		}
 	}
+	ghostScore := 0
+	if p.ghost != nil {
+		ghostScore = p.ghostEntry.Score
+	}
+	a.Grant(achieve.CheckRun(achieve.Run{
+		Track: p.track, Result: r.res, ParTicks: p.lv.ParTicks,
+		GoldenTotal: len(p.lv.Golden), GoldenTaken: p.goldenGot,
+		CursedTotal: len(p.lv.Cursed), CursedTaken: p.cursedGot,
+		HoleHit: p.holeHit, GhostScore: ghostScore, UsedBot: p.usedBot,
+		Medals: a.Prof.Medals,
+	})...)
 	r.top = a.Records.Top(key)
 	if r.res.Won && p.track.Daily == "" && p.track.Level < sim.LevelsPerWorld {
 		r.items = append(r.items, "Следующий уровень")
