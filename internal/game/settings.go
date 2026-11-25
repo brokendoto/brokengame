@@ -45,8 +45,12 @@ type settingsScene struct {
 func newSettingsScene() *settingsScene {
 	s := &settingsScene{items: []setItem{siVolume, siMusic, siSound, siShake, siGhost}}
 	if !IsMobile() {
-		// На телефоне нет полного экрана и физической клавиатуры.
-		s.items = append(s.items, siFullscreen, siKeysSolo, siKeysDuel1, siKeysDuel2, siKeysReset)
+		// В приложении на телефоне нет полного экрана, а клавиатуры нет
+		// ни там, ни в браузере на телефоне.
+		s.items = append(s.items, siFullscreen)
+		if !touchFirst {
+			s.items = append(s.items, siKeysSolo, siKeysDuel1, siKeysDuel2, siKeysReset)
+		}
 	}
 	s.items = append(s.items, siBack)
 	return s

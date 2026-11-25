@@ -20,6 +20,9 @@ func SetDir(dir string) { dirOverride = dir }
 
 // Dir возвращает папку сохранений или "" если её нет.
 func Dir() string {
+	if webStorage {
+		return "pyatimirye"
+	}
 	if dirOverride != "" {
 		if err := os.MkdirAll(dirOverride, 0o755); err == nil {
 			return dirOverride
@@ -50,18 +53,14 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return storeFile(path, b)
 }
 
 func readJSON(path string, v any) error {
 	if path == "" {
 		return os.ErrNotExist
 	}
-	b, err := os.ReadFile(path)
+	b, err := loadFile(path)
 	if err != nil {
 		return err
 	}

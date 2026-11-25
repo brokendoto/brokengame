@@ -19,6 +19,7 @@ type theme struct {
 	itemGlow                 rgbaT
 	darkness                 float64 // 0 — светло, 0.6 — темно, светит только фонарь
 	lampColor                rgbaT
+	ambient                  rgbaT // окружающий свет (карта освещения), см. lighting.go
 	eyeBasic, eyeSpecial     rgbaT
 	beam                     rgbaT
 	short                    string // короткое имя мира для HUD
@@ -31,7 +32,7 @@ var themes = [sim.WorldCount]theme{
 		wall: rgba(84, 72, 64, 255), wallHi: rgba(122, 106, 92, 255), wallLo: rgba(52, 43, 38, 255),
 		zone: rgba(78, 52, 30, 255), zoneDark: rgba(64, 42, 24, 255), zoneHi: rgba(110, 78, 48, 255),
 		bg: rgba(12, 10, 14, 255), itemGlow: rgba(90, 220, 255, 255),
-		darkness: 0.62, lampColor: rgba(255, 220, 150, 255),
+		darkness: 0.62, lampColor: rgba(255, 220, 150, 255), ambient: rgba(78, 72, 96, 255),
 		eyeBasic: rgba(255, 60, 60, 255), eyeSpecial: rgba(120, 255, 90, 255),
 		beam: rgba(255, 150, 60, 255), short: "Шахта",
 	},
@@ -40,7 +41,7 @@ var themes = [sim.WorldCount]theme{
 		wall: rgba(44, 66, 34, 255), wallHi: rgba(84, 116, 52, 255), wallLo: rgba(30, 46, 24, 255),
 		zone: rgba(56, 96, 130, 255), zoneDark: rgba(44, 78, 110, 255), zoneHi: rgba(150, 200, 230, 255),
 		bg: rgba(20, 24, 14, 255), itemGlow: rgba(255, 200, 90, 255),
-		darkness: 0.12, lampColor: rgba(255, 230, 180, 255),
+		darkness: 0.12, lampColor: rgba(255, 230, 180, 255), ambient: rgba(214, 214, 196, 255),
 		eyeBasic: rgba(255, 220, 90, 255), eyeSpecial: rgba(255, 140, 60, 255),
 		beam: rgba(255, 170, 60, 255), short: "Лес",
 	},
@@ -49,7 +50,7 @@ var themes = [sim.WorldCount]theme{
 		wall: rgba(110, 36, 44, 255), wallHi: rgba(212, 170, 80, 255), wallLo: rgba(70, 22, 30, 255),
 		zone: rgba(120, 120, 150, 255), zoneDark: rgba(90, 90, 120, 255), zoneHi: rgba(200, 200, 230, 255),
 		bg: rgba(10, 8, 18, 255), itemGlow: rgba(160, 220, 255, 255),
-		darkness: 0.5, lampColor: rgba(255, 190, 120, 255),
+		darkness: 0.5, lampColor: rgba(255, 190, 120, 255), ambient: rgba(92, 80, 128, 255),
 		eyeBasic: rgba(255, 220, 120, 255), eyeSpecial: rgba(200, 160, 255, 255),
 		beam: rgba(200, 150, 255, 255), short: "Храм",
 	},
@@ -58,7 +59,7 @@ var themes = [sim.WorldCount]theme{
 		wall: rgba(112, 100, 76, 255), wallHi: rgba(150, 136, 104, 255), wallLo: rgba(74, 66, 50, 255),
 		zone: rgba(24, 22, 26, 255), zoneDark: rgba(14, 12, 16, 255), zoneHi: rgba(120, 90, 200, 255),
 		bg: rgba(18, 16, 14, 255), itemGlow: rgba(120, 255, 140, 255),
-		darkness: 0.28, lampColor: rgba(255, 230, 200, 255),
+		darkness: 0.28, lampColor: rgba(255, 230, 200, 255), ambient: rgba(158, 142, 130, 255),
 		eyeBasic: rgba(255, 70, 50, 255), eyeSpecial: rgba(255, 220, 40, 255),
 		beam: rgba(255, 50, 50, 255), short: "Фронт",
 	},
@@ -67,7 +68,7 @@ var themes = [sim.WorldCount]theme{
 		wall: rgba(66, 74, 104, 255), wallHi: rgba(120, 132, 176, 255), wallLo: rgba(40, 46, 68, 255),
 		zone: rgba(14, 18, 40, 255), zoneDark: rgba(8, 10, 26, 255), zoneHi: rgba(150, 190, 255, 255),
 		bg: rgba(4, 4, 12, 255), itemGlow: rgba(255, 230, 110, 255),
-		darkness: 0.4, lampColor: rgba(200, 230, 255, 255),
+		darkness: 0.4, lampColor: rgba(200, 230, 255, 255), ambient: rgba(96, 106, 156, 255),
 		eyeBasic: rgba(140, 255, 120, 255), eyeSpecial: rgba(230, 120, 255, 255),
 		beam: rgba(80, 220, 255, 255), short: "Космос",
 	},
