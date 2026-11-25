@@ -8,6 +8,5 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui" -o dist/Py
 mkdir -p dist/web
 GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o dist/web/game.wasm ./cmd/pyatimirye
 cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/web/
-cp scripts/index.html dist/web/
 python3 scripts/make-html.py dist/web dist/Pyatimirye.html
 echo "Готово: dist/Pyatimirye.exe, dist/Pyatimirye.html (открыть двойным щелчком) и dist/web/"
