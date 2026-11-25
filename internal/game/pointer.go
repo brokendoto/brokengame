@@ -16,6 +16,10 @@ import (
 // IsMobile — запущена ли игра на телефоне или планшете.
 func IsMobile() bool { return runtime.GOOS == "android" || runtime.GOOS == "ios" }
 
+// touchFirst — управление в первую очередь пальцами: телефон или веб-версия
+// на сенсорном экране. Значение не меняется, поэтому считаем один раз.
+var touchFirst = touchScreen()
+
 type touchState struct {
 	sx, sy   float64 // где палец коснулся экрана
 	x, y     float64 // где он сейчас
@@ -34,7 +38,7 @@ type pointer struct {
 }
 
 func newPointer() *pointer {
-	return &pointer{touches: map[ebiten.TouchID]*touchState{}, touchMode: IsMobile()}
+	return &pointer{touches: map[ebiten.TouchID]*touchState{}, touchMode: touchFirst}
 }
 
 func (p *pointer) update() {
@@ -63,7 +67,7 @@ func (p *pointer) update() {
 		p.tapped, p.tapX, p.tapY = true, float64(x), float64(y)
 	}
 	// Клавиатура или геймпад — прячем экранные кнопки (кроме телефонов).
-	if !IsMobile() && (len(inpututil.AppendJustPressedKeys(nil)) > 0) {
+	if !touchFirst && (len(inpututil.AppendJustPressedKeys(nil)) > 0) {
 		p.touchMode = false
 	}
 }
@@ -102,7 +106,7 @@ func (h *hits) tapped(a *App) (int, bool) {
 
 // hover возвращает id зоны под курсором мыши (на компьютере).
 func (h *hits) hover() (int, bool) {
-	if IsMobile() {
+	if touchFirst {
 		return 0, false
 	}
 	x, y := ebiten.CursorPosition()
