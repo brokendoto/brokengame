@@ -70,10 +70,11 @@ jobs:
           GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o dist/web/game.wasm ./cmd/pyatimirye
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/web/
           python3 scripts/make-html.py dist/web dist/Pyatimirye.html
+          ./scripts/make-pages.sh dist/web dist/site
       - uses: actions/upload-artifact@v4
         with:
           name: Pyatimirye-web
-          path: dist/web
+          path: dist/site
       - uses: actions/upload-artifact@v4
         with:
           name: Pyatimirye-html

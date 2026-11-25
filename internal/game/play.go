@@ -185,6 +185,7 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvPickup:
 			a.Sound.PlayPickup(e.N)
 			fx.burst(x, y, 16, themes[w].itemGlow, 5, 3, true)
+			fx.ring(x, y, themes[w].itemGlow, 34)
 			pts := int(100 * (1 + 0.25*float64(min(e.N, 9)-1)))
 			c := colText
 			if e.N >= 3 {
@@ -197,14 +198,17 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvExitOpen:
 			a.Sound.Play(sfx.ExitOpen)
 			fx.burst(x, y, 40, exitGlow, 7, 4, true)
+			fx.ring(x, y, exitGlow, 120)
 			banner("Все " + sim.Worlds[w].ItemsPl + " собраны — к выходу!")
 		case sim.EvHit:
 			a.Sound.Play(sfx.Hit)
 			fx.shake, fx.flash = 14, 1
 			fx.burst(x, y, 20, colRed, 6, 4, false)
+			fx.ring(x, y, colRed, 50)
 		case sim.EvBlock:
 			a.Sound.Play(sfx.Block)
 			fx.burst(x, y, 14, colAccent, 6, 3, true)
+			fx.ring(x, y, colAccent, 44)
 		case sim.EvDash:
 			a.Sound.Play(sfx.Dash)
 			fx.debris(x, y+10, 6, themes[w].speck)
@@ -221,6 +225,7 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 				for i := 0; i < 3; i++ {
 					fx.burst(x, y, 24, c, 8+float64(i)*3, 3, true)
 				}
+				fx.ring(x, y, c, 150)
 			default:
 				a.Sound.Play(sfx.Shield)
 				fx.burst(x, y, 20, c, 4, 3, true)
@@ -241,12 +246,14 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvGolden:
 			a.Sound.PlayPickup(e.N + 2)
 			fx.burst(x, y, 24, colGold, 6, 3, true)
+			fx.ring(x, y, colGold, 46)
 			pts := int(sim.GoldenScore * (1 + 0.25*float64(min(e.N, 9)-1)))
 			fx.text("+"+itoa(pts), x, y-30, colGold, 24)
 		case sim.EvVanish:
 			fx.burst(x, y, 10, withAlpha(colGold, 0.6), 3, 2, true)
 		case sim.EvHole:
 			fx.burst(x, y, 30, rgba(170, 90, 255, 255), 6, 4, true)
+			fx.ring(x, y, rgba(170, 90, 255, 255), 60)
 		case sim.EvRockWarn, sim.EvCaveWarn:
 			a.Sound.Play(sfx.Warn)
 		case sim.EvRockBreak:
@@ -262,6 +269,8 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvWin:
 			a.Sound.Play(sfx.Win)
 			fx.burst(x, y, 60, exitGlow, 9, 4, true)
+			fx.ring(x, y, exitGlow, 90)
+			fx.ring(x, y, rgba(255, 255, 255, 255), 50)
 		case sim.EvLose:
 			a.Sound.Play(sfx.Lose)
 		case sim.EvKnockout:

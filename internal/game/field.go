@@ -47,6 +47,9 @@ type fieldView struct {
 	lv     *sim.Level
 	w      sim.World
 	static *ebiten.Image
+
+	lastPos [2][2]float64 // где были герои в прошлый кадр — для пыли из-под ног
+	stepT   [2]int
 }
 
 func newFieldView(lv *sim.Level) *fieldView {
@@ -70,11 +73,29 @@ func (f *fieldView) renderStatic() {
 			}
 		}
 	}
-	// Тени под стенами, потом сами стены.
+	// Мягкие тени от стен (свет сверху-слева): длинная снизу, короткая справа,
+	// и лёгкое затенение пола вдоль любой стены (ambient occlusion).
 	for y := 0; y < sim.H; y++ {
 		for x := 0; x < sim.W; x++ {
-			if lv.Grid[y][x] == sim.Wall && !lv.Solid(x, y+1) {
-				fillRect(img, float64(x*CellPx), float64((y+1)*CellPx), CellPx, 10, rgba(0, 0, 0, 90))
+			if lv.Grid[y][x] == sim.Wall {
+				continue
+			}
+			X, Y := float64(x*CellPx), float64(y*CellPx)
+			for i := 0; i < 8; i++ {
+				k := 1 - float64(i)/8
+				a := uint8(70 * k * k)
+				if lv.Solid(x, y-1) && y > 0 {
+					fillRect(img, X, Y+float64(i)*2.5, CellPx, 2.5, rgba(0, 0, 0, a))
+				}
+				if lv.Solid(x-1, y) && x > 0 {
+					fillRect(img, X+float64(i)*1.5, Y, 1.5, CellPx, rgba(0, 0, 0, a*2/3))
+				}
+				if lv.Solid(x+1, y) && x < sim.W-1 {
+					fillRect(img, X+CellPx-float64(i+1)*1, Y, 1, CellPx, rgba(0, 0, 0, a/3))
+				}
+				if lv.Solid(x, y+1) && y < sim.H-1 {
+					fillRect(img, X, Y+CellPx-float64(i+1)*1, CellPx, 1, rgba(0, 0, 0, a/3))
+				}
 			}
 		}
 	}
@@ -85,6 +106,7 @@ func (f *fieldView) renderStatic() {
 			}
 		}
 	}
+	drawLamps(img, lv, f.w)
 }
 
 // drawWorld рисует поле со всеми объектами. ghost может быть nil.
@@ -99,6 +121,7 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 	w := f.w
 	th := &themes[w]
 	cpx := func(p sim.Pt) (float64, float64) { return px(float64(p.X)+0.5) + ox, py(float64(p.Y)+0.5) + oy }
+	drawAmbient(field, w, t, ox, oy, false)
 
 	// Чёрные дыры — под всем остальным.
 	for _, h := range f.lv.Holes {
@@ -185,8 +208,9 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 	}
 	// След рывка.
 	for i, p := range trail {
-		a := float64(i+1) / float64(len(trail)+1) * 0.35
-		fillCircle(field, px(p[0])+ox, py(p[1])+oy, 0.3*CellPx, withAlpha(rgba(255, 190, 90, 255), a))
+		a := float64(i+1) / float64(len(trail)+1) * 0.45
+		glow(field, px(p[0])+ox, py(p[1])+oy, 26, th.lampColor, a*0.6)
+		drawHero(field, w, st.P, px(p[0])+ox, py(p[1])+oy, t, a, true)
 	}
 	// Игрок (мигает после удара). В дуэли — оба, с цветными кольцами.
 	heroes := []sim.Player{st.P}
@@ -234,9 +258,6 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 	} else if st.P.Invuln == 0 || (frame/4)%2 == 0 {
 		drawHero(field, w, st.P, px(st.P.X)+ox, py(st.P.Y)+oy, t, 1, false)
 	}
-	fx.draw(field, 0, 0)
-	p := st.P
-	pxp, pyp := px(p.X)+ox, py(p.Y)+oy
 
 	// Туман храма — поверх всего, что в нём.
 	if w == sim.Temple {
@@ -256,19 +277,11 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 		}
 	}
 
-	// Темнота: светло только вокруг героя.
-	lx, ly := pxp+p.FX*18, pyp+p.FY*18
-	dark := th.darkness > 0 && f.duel == nil // в дуэли светло, чтобы видели оба
-	if dark {
-		dop := &ebiten.DrawImageOptions{}
-		scale := 2800.0 / 256
-		dop.GeoM.Translate(-128, -128)
-		dop.GeoM.Scale(scale, scale)
-		dop.GeoM.Translate(lx, ly)
-		dop.ColorScale.ScaleAlpha(float32(th.darkness))
-		dop.Filter = ebiten.FilterLinear
-		field.DrawImage(darkImg, dop)
-	}
+	f.footsteps(heroes, fx, frame)
+	f.drawLighting(field, st, heroes, fx, t, ox, oy)
+	drawAmbient(field, w, t, ox, oy, true)
+	fx.draw(field, 0, 0)
+	fx.drawRings(field)
 	// Стоп-время: мир становится сиреневым.
 	if st.FreezeT > 0 {
 		a := 0.18
@@ -313,9 +326,6 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 			}
 			glow(field, px(c.X)+ox, py(c.Y)+oy, 22, eye, 0.5)
 		}
-	}
-	if dark {
-		glow(field, lx, ly, 70, th.lampColor, 0.18)
 	}
 	for _, h := range heroes {
 		if h.ShieldT > 0 {
