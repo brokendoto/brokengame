@@ -268,8 +268,15 @@ func drawMedal(dst *ebiten.Image, x, y, r float64, m sim.Medal) {
 
 // drawPanel — полупрозрачная панель.
 func drawPanel(dst *ebiten.Image, x, y, w, h float64) {
+	// Мягкая тень под панелью, сама панель, светлый блик по верхней кромке.
+	for i := 3; i >= 1; i-- {
+		d := float64(i) * 3
+		roundRect(dst, x-d+2, y-d+6, w+2*d-4, h+2*d-4, 16+d, rgba(0, 0, 0, uint8(26)))
+	}
 	roundRect(dst, x, y, w, h, 16, colPanel)
+	roundRect(dst, x+2, y+2, w-4, math.Min(h*0.45, 60), 14, withAlpha(rgba(255, 255, 255, 255), 0.035))
 	roundRectStroke(dst, x, y, w, h, 16, 2, rgba(90, 80, 120, 200))
+	line(dst, x+18, y+1.5, x+w-18, y+1.5, 1.5, withAlpha(rgba(190, 170, 240, 255), 0.35))
 }
 
 // keyHint рисует подсказку управления внизу экрана.
