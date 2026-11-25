@@ -136,6 +136,30 @@
     return frame().then(function () { return inflate(bin, size); });
   }
 
+  // Во встроенных окнах (iframe на itch.io, превью, мессенджеры) политика
+  // страницы может запрещать геймпады: тогда getGamepads бросает ошибку, и
+  // Ebitengine падает. Подменяем на безопасную версию — без геймпадов игра
+  // просто работает с клавиатурой и касаниями. Так же страхуем вибрацию.
+  try {
+    var nav = navigator, gp = nav.getGamepads || nav.webkitGetGamepads;
+    nav.getGamepads = function () {
+      try { return gp ? gp.call(nav) || [] : []; } catch (e) { return []; }
+    };
+  } catch (e) {}
+  try {
+    var kb = navigator.keyboard;
+    if (kb && kb.getLayoutMap) {
+      var glm = kb.getLayoutMap;
+      kb.getLayoutMap = function () {
+        try { return glm.call(kb); } catch (e) { return Promise.reject(e); }
+      };
+    }
+  } catch (e) {}
+  try {
+    var vib = navigator.vibrate;
+    if (vib) navigator.vibrate = function () { try { return vib.apply(navigator, arguments); } catch (e) { return false; } };
+  } catch (e) {}
+
   // Из file:// модуль AudioWorklet не загружается (у страницы нет «origin»),
   // и звука не было бы совсем. Прячем AudioWorklet — звук пойдёт старым путём.
   if (location.protocol === "file:") {

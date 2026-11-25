@@ -44,7 +44,7 @@ func drawAmbient(dst *ebiten.Image, w sim.World, t, ox, oy float64, lit bool) {
 		case sim.Mine:
 			if !lit { // пыль в луче фонаря
 				x, y := X(m.x0+t*0.08*m.sp+math.Sin(t*0.01+m.ph)*30), Y(m.y0+t*0.05*m.sp)
-				fillCircle(dst, x, y, 1+m.k*1.5, rgba(200, 190, 170, 110))
+				fillCircle(dst, x, y, 1+m.k*1.5, withAlpha(rgba(200, 190, 170, 255), 0.45))
 			} else if i%5 == 0 { // искорки кристаллов
 				a := math.Pow(math.Max(0, math.Sin(t*0.03*m.sp+m.ph)), 6)
 				x, y := X(m.x0), Y(m.y0+math.Sin(t*0.01+m.ph)*10)
@@ -78,7 +78,7 @@ func drawAmbient(dst *ebiten.Image, w sim.World, t, ox, oy float64, lit bool) {
 			if !lit { // пепел
 				x := X(m.x0 + t*0.2*m.sp + math.Sin(t*0.01+m.ph)*20)
 				y := Y(m.y0 + t*0.25*m.sp)
-				fillRect(dst, x, y, 2+m.k*2, 2+m.k*2, rgba(170, 165, 160, 150))
+				fillRect(dst, x, y, 2+m.k*2, 2+m.k*2, withAlpha(rgba(170, 165, 160, 255), 0.6))
 			} else if i%3 == 0 { // искры, летящие вверх
 				x := X(m.x0 + math.Sin(t*0.03*m.sp+m.ph)*14 + t*0.1)
 				y := Y(m.y0 - t*0.6*m.sp)
@@ -107,11 +107,11 @@ func drawAmbient(dst *ebiten.Image, w sim.World, t, ox, oy float64, lit bool) {
 }
 
 func drawLeaf(dst *ebiten.Image, x, y, ang, s float64, i int) {
-	c := rgba(214, 120, 40, 230)
+	c := withAlpha(rgba(214, 120, 40, 255), 0.9)
 	if i%3 == 0 {
-		c = rgba(230, 180, 60, 230)
+		c = withAlpha(rgba(230, 180, 60, 255), 0.9)
 	} else if i%5 == 0 {
-		c = rgba(170, 60, 40, 230)
+		c = withAlpha(rgba(170, 60, 40, 255), 0.9)
 	}
 	ca, sa := math.Cos(ang), math.Sin(ang)
 	sq := 0.45 + 0.55*math.Abs(math.Sin(ang*1.7)) // лист переворачивается в полёте
@@ -125,6 +125,6 @@ func drawLeaf(dst *ebiten.Image, x, y, ang, s float64, i int) {
 
 func drawPetal(dst *ebiten.Image, x, y, ang, s float64) {
 	sq := 0.4 + 0.6*math.Abs(math.Sin(ang*1.3))
-	fillPoly(dst, ellipse(x, y, s, s*0.6*sq+0.5, ang, 10), rgba(255, 170, 200, 200))
-	fillPoly(dst, ellipse(x-s*0.2, y-s*0.1, s*0.45, s*0.25*sq+0.3, ang, 8), rgba(255, 220, 235, 200))
+	fillPoly(dst, ellipse(x, y, s, s*0.6*sq+0.5, ang, 10), withAlpha(rgba(255, 170, 200, 255), 0.8))
+	fillPoly(dst, ellipse(x-s*0.2, y-s*0.1, s*0.45, s*0.25*sq+0.3, ang, 8), withAlpha(rgba(255, 220, 235, 255), 0.8))
 }
