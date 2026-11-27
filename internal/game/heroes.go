@@ -18,6 +18,9 @@ import (
 // детали друг сквозь друга.
 var heroBuf *ebiten.Image
 
+// heroSkin — выбранный игроком герой (save.Profile.Skin): 0 — герой своего мира.
+var heroSkin int
+
 const heroBufW, heroBufH = 96, 96
 
 // heroScale — во сколько раз герой крупнее чертежа (рисуем в масштабе
@@ -37,6 +40,9 @@ var heroLooks = [sim.WorldCount]heroLook{
 }
 
 func drawHero(dst *ebiten.Image, w sim.World, p sim.Player, x, y, t, alpha float64, ghost bool) {
+	if heroSkin > 0 && heroSkin <= int(sim.WorldCount) {
+		w = sim.World(heroSkin - 1)
+	}
 	if heroBuf == nil {
 		heroBuf = ebiten.NewImage(heroBufW, heroBufH)
 	}

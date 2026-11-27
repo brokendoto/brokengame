@@ -17,6 +17,11 @@ type Profile struct {
 	Volume     int            `json:"volume"` // громкость 0..100
 	Shake      bool           `json:"shake"`  // тряска экрана и вспышки
 	Music      int            `json:"music"`  // громкость музыки 0..100
+	// ShowAll — режим показа: все миры и уровни открыты (для презентации).
+	ShowAll bool `json:"show_all,omitempty"`
+	// Skin — выбранный герой: 0 — свой у каждого мира, 1..5 — герой мира Skin-1
+	// во всех мирах. Чисто внешний вид, способности остаются от мира.
+	Skin int `json:"skin,omitempty"`
 	// Keys — переназначенные клавиши: "solo.dash" → ["Space", "ShiftLeft"].
 	Keys map[string][]string `json:"keys,omitempty"`
 	// Achievements: идентификатор достижения → дата получения.
@@ -51,6 +56,9 @@ func LoadProfile(dir string) *Profile {
 	if p.Music < 0 || p.Music > 100 {
 		p.Music = 60
 	}
+	if p.Skin < 0 || p.Skin > int(sim.WorldCount) {
+		p.Skin = 0
+	}
 	if p.Diff < 0 || p.Diff >= sim.DifficultyCount {
 		p.Diff = sim.Normal
 	}
@@ -69,6 +77,9 @@ func unlockKey(w sim.World, d sim.Difficulty) string {
 
 // UnlockedLevel — сколько уровней мира открыто на сложности.
 func (p *Profile) UnlockedLevel(w sim.World, d sim.Difficulty) int {
+	if p.ShowAll {
+		return sim.LevelsPerWorld
+	}
 	if n := p.Unlocked[unlockKey(w, d)]; n > 0 {
 		return n
 	}
@@ -96,7 +107,7 @@ const LevelsToUnlockWorld = 4
 // WorldOpen — открыт ли мир. Первый открыт всегда, каждый следующий —
 // после LevelsToUnlockWorld пройденных уровней предыдущего.
 func (p *Profile) WorldOpen(w sim.World) bool {
-	if w <= sim.Mine {
+	if w <= sim.Mine || p.ShowAll {
 		return true
 	}
 	for d := sim.Difficulty(0); d < sim.DifficultyCount; d++ {

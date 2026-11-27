@@ -367,7 +367,7 @@ func (s *playScene) Draw(a *App, dst *ebiten.Image) {
 		if a.Pointer.touchMode {
 			key = "кнопка"
 		}
-		drawTextShadow(dst, sim.Worlds[w].Hero+": «"+ab.Name+"» ("+key+") — "+ab.Hint, 16, false, ScreenW/2, ScreenH/2+130, Center, abilityColor(s.lv.Rules().Ability))
+		drawTextShadow(dst, heroLabel(w)+": «"+ab.Name+"» ("+key+") — "+ab.Hint, 16, false, ScreenW/2, ScreenH/2+130, Center, abilityColor(s.lv.Rules().Ability))
 		if s.ghost != nil {
 			drawTextShadow(dst, "Соперник-призрак: "+s.ghostEntry.Name+" · "+fmtScore(s.ghostEntry.Score)+" очков", 18, false, ScreenW/2, ScreenH/2+160, Center, rgba(170, 210, 255, 255))
 		}
