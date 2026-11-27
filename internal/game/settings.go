@@ -1,6 +1,8 @@
 package game
 
 import (
+	"math"
+
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -14,6 +16,7 @@ import (
 func (a *App) applySettings() {
 	a.Sound.Volume = float64(a.Prof.Volume) / 100
 	screenShake = a.Prof.Shake
+	heroSkin = a.Prof.Skin
 	setLayouts(controls.FromMap(a.Prof.Keys, keyValid))
 }
 
@@ -27,6 +30,7 @@ const (
 	siSound
 	siShake
 	siGhost
+	siShowAll
 	siFullscreen
 	siKeysSolo
 	siKeysDuel1
@@ -43,7 +47,7 @@ type settingsScene struct {
 }
 
 func newSettingsScene() *settingsScene {
-	s := &settingsScene{items: []setItem{siVolume, siMusic, siSound, siShake, siGhost}}
+	s := &settingsScene{items: []setItem{siVolume, siMusic, siSound, siShake, siGhost, siShowAll}}
 	if !IsMobile() {
 		// В приложении на телефоне нет полного экрана, а клавиатуры нет
 		// ни там, ни в браузере на телефоне.
@@ -75,6 +79,8 @@ func (s *settingsScene) label(a *App, it setItem) string {
 		return "Тряска экрана и вспышки: " + onOff(a.Prof.Shake)
 	case siGhost:
 		return "Призрак соперника: " + onOff(a.Prof.ShowGhost)
+	case siShowAll:
+		return "Режим показа (все миры открыты): " + onOff(a.Prof.ShowAll)
 	case siFullscreen:
 		return "Полный экран: " + onOff(ebiten.IsFullscreen())
 	case siKeysSolo:
@@ -152,6 +158,14 @@ func (s *settingsScene) Update(a *App) {
 	case siGhost:
 		a.Prof.ShowGhost = !a.Prof.ShowGhost
 		_ = a.Prof.Save()
+	case siShowAll:
+		a.Prof.ShowAll = !a.Prof.ShowAll
+		_ = a.Prof.Save()
+		if a.Prof.ShowAll {
+			a.Toast("Все миры и уровни открыты")
+		} else {
+			a.Toast("Миры открываются по мере прохождения")
+		}
 	case siFullscreen:
 		a.SetFullscreen(!ebiten.IsFullscreen())
 	case siKeysSolo:
@@ -187,9 +201,10 @@ func (s *settingsScene) Draw(a *App, dst *ebiten.Image) {
 	a.drawBackground(dst)
 	drawTextShadow(dst, "Настройки", 44, true, ScreenW/2, 40, Center, colText)
 	s.hits.reset()
-	y0 := 140.0
+	y0 := 130.0
+	step := math.Min(46, 500/float64(len(s.items)))
 	for i, it := range s.items {
-		y := y0 + float64(i)*46
+		y := y0 + float64(i)*step
 		if it == siKeysSolo || it == siBack {
 			y0 += 16 // отступ перед группой
 			y += 16

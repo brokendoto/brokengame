@@ -28,6 +28,7 @@ const (
 	miRecords
 	miDiff
 	miPlayer
+	miHero
 	miAchievements
 	miSettings
 	miQuit
@@ -42,7 +43,7 @@ type menuScene struct {
 }
 
 func newMenuScene() *menuScene {
-	m := &menuScene{items: []menuItem{miCampaign, miDaily, miMarathon, miDuel, miRecords, miAchievements, miDiff, miPlayer, miSettings}}
+	m := &menuScene{items: []menuItem{miCampaign, miDaily, miMarathon, miDuel, miRecords, miAchievements, miHero, miDiff, miPlayer, miSettings}}
 	if CanQuit() {
 		m.items = append(m.items, miQuit)
 	}
@@ -65,6 +66,8 @@ func (m *menuScene) label(a *App, it menuItem) string {
 		return "Сложность:  ‹ " + sim.Difficulties[a.Prof.Diff].Name + " ›"
 	case miPlayer:
 		return "Игрок: " + a.Prof.Name
+	case miHero:
+		return "Герой: " + skinName(a.Prof.Skin)
 	case miAchievements:
 		return "Достижения: " + itoa(len(a.Prof.Achievements)) + " из " + itoa(len(achieve.List))
 	case miSettings:
@@ -128,6 +131,8 @@ func (m *menuScene) Update(a *App) {
 		_ = a.Prof.Save()
 	case miPlayer:
 		a.Goto(newNameScene(false))
+	case miHero:
+		a.Goto(newSkinScene(a))
 	case miAchievements:
 		a.Goto(newAchievementsScene())
 	case miSettings:
@@ -151,11 +156,11 @@ func (m *menuScene) Draw(a *App, dst *ebiten.Image) {
 	drawText(dst, "Пять миров. Один рекорд.", 22, false, ScreenW/2, 176, Center, colDim)
 
 	// Пункты меню.
-	y0 := 226.0
+	y0 := 220.0
 	m.hits.reset()
 	for i, it := range m.items {
-		y := y0 + float64(i)*39
-		m.hits.add(rect{ScreenW/2 - 300, y - 7, 600, 39}, i)
+		y := y0 + float64(i)*37
+		m.hits.add(rect{ScreenW/2 - 300, y - 7, 600, 37}, i)
 		sel := i == m.sel
 		if sel {
 			w := textWidth(m.label(a, it), 24, true) + 60
@@ -219,6 +224,9 @@ const (
 func newLevelScene(a *App) *levelScene {
 	l := &levelScene{world: a.Prof.World}
 	l.sel = a.Prof.UnlockedLevel(l.world, a.Prof.Diff) - 1
+	if a.Prof.ShowAll {
+		l.sel = 0 // в режиме показа открыто всё — начинаем с первого уровня
+	}
 	return l
 }
 
@@ -239,6 +247,9 @@ func (l *levelScene) setWorld(a *App, w sim.World) {
 	}
 	l.world = w
 	l.sel = a.Prof.UnlockedLevel(w, a.Prof.Diff) - 1
+	if a.Prof.ShowAll {
+		l.sel = 0
+	}
 	if a.Prof.WorldOpen(w) {
 		a.Prof.World = w
 		_ = a.Prof.Save()
@@ -702,7 +713,7 @@ func (n *nameScene) drawKeyboard(dst *ebiten.Image) {
 }
 
 // Version — версия игры.
-const Version = "0.12"
+const Version = "0.13"
 
 func versionText() string {
 	v := "v" + Version + " · Go + Ebitengine"
