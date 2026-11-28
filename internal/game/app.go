@@ -48,6 +48,7 @@ type App struct {
 	duelWins  [2]int
 	duelWorld sim.World
 	duelLevel int
+	duelMode  sim.DuelMode
 	bgDust    []dust
 	Headless  bool // без окна (для скриншотов и тестов)
 }
@@ -143,6 +144,7 @@ func (a *App) Update() error {
 		vol = 0
 	}
 	a.Music.update(musicFor(cur), vol)
+	a.prefetchMusic(cur)
 	if len(a.achQueue) > 0 {
 		a.achT++
 		if a.achT > achShowTicks {

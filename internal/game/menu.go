@@ -123,7 +123,7 @@ func (m *menuScene) Update(a *App) {
 	case miMarathon:
 		a.Goto(newMarathonPlay(a, newMarathonRun()))
 	case miDuel:
-		a.Goto(newDuelSetupScene(a))
+		a.Goto(newDuelModeScene(a))
 	case miRecords:
 		a.Goto(newRecordsScene(a))
 	case miDiff:
@@ -713,7 +713,7 @@ func (n *nameScene) drawKeyboard(dst *ebiten.Image) {
 }
 
 // Version — версия игры.
-const Version = "0.13"
+const Version = "0.15"
 
 func versionText() string {
 	v := "v" + Version + " · Go + Ebitengine"

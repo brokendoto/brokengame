@@ -66,6 +66,12 @@ func (p *pointer) update() {
 		x, y := ebiten.CursorPosition()
 		p.tapped, p.tapX, p.tapY = true, float64(x), float64(y)
 	}
+	if x, y, touch, ok := lostTap(); ok && !p.tapped {
+		p.tapped, p.tapX, p.tapY = true, x, y
+		if touch {
+			p.touchMode = true
+		}
+	}
 	// Клавиатура или геймпад — прячем экранные кнопки (кроме телефонов).
 	if !touchFirst && (len(inpututil.AppendJustPressedKeys(nil)) > 0) {
 		p.touchMode = false

@@ -38,6 +38,9 @@ const (
 	EvKnockout // дуэль: игрок выбит (N — номер игрока)
 	EvRespawn  // дуэль: игрок вернулся на старт
 	EvStun     // дуэль: соперник оглушён толчком или способностью
+	EvDrop     // дуэль: на поле упал выбитый предмет (N — чей)
+	EvLoss     // дуэль: игрок N потерял P предметов
+	EvBank     // дуэль «Банк»: игрок N сдал P предметов
 )
 
 // Event — событие шага.
@@ -527,7 +530,7 @@ func (s *State) updatePickups() {
 			s.emit(EvPickup, ix, iy, s.Combo)
 		}
 	}
-	if !s.ExitOpen && s.Collected == len(s.Items) {
+	if s.duel == nil && !s.ExitOpen && s.Collected == len(s.Items) {
 		s.ExitOpen = true
 		s.emit(EvExitOpen, float64(s.Lv.Exit.X)+0.5, float64(s.Lv.Exit.Y)+0.5, 0)
 	}
@@ -543,7 +546,7 @@ func (s *State) updatePickups() {
 			s.emit(EvHeal, hx, hy, s.Lives)
 		}
 	}
-	if s.ExitOpen {
+	if s.ExitOpen && s.duel == nil {
 		ex, ey := float64(s.Lv.Exit.X)+0.5, float64(s.Lv.Exit.Y)+0.5
 		if math.Hypot(p.X-ex, p.Y-ey) < 0.5 {
 			s.Status = Won
