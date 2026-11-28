@@ -759,7 +759,7 @@ func (r *duelResultScene) Draw(a *App, dst *ebiten.Image) {
 			drawText(dst, row[1], 20, true, x+456, y, Right, colText)
 		}
 		drawText(dst, "Раунды", 22, false, x+24, 398, Left, colDim)
-		drawWinPips(dst, x+130, 412, m.Wins[i], duelColors[i], 11)
+		drawWinPips(dst, x+150, 412, m.Wins[i], duelColors[i], 11)
 		drawText(dst, itoa(m.Wins[i]), 36, true, x+456, 388, Right, colText)
 	}
 	// История раундов.
