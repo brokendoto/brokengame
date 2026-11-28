@@ -217,6 +217,9 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 	if f.duel != nil {
 		heroes = heroes[:0]
 		for i, d := range f.duel.D {
+			if f.duel.Out(i) {
+				continue
+			}
 			if d.Down > 0 {
 				x, y := px(float64(d.Start.X)+0.5)+ox, py(float64(d.Start.Y)+0.5)+oy
 				strokeCircle(field, x, y, 18, 3, withAlpha(duelColors[i], 0.6))
@@ -248,6 +251,12 @@ func (f *fieldView) drawWorld(dst *ebiten.Image, st, ghost *sim.State, frame int
 				drawHero(field, w, d.P, x, y, t, 1, false)
 			}
 			drawTextShadow(field, itoa(i+1), 15, true, x, y-38, Center, duelColors[i])
+			if f.duel.Mode == sim.DuelBank && d.Carry > 0 {
+				// Мешок с добычей над головой.
+				fillCircle(field, x+17, y-30, 10, rgba(40, 30, 20, 230))
+				strokeCircle(field, x+17, y-30, 10, 2, duelColors[i])
+				drawText(field, itoa(d.Carry), 13, true, x+17, y-39, Center, colText)
+			}
 			if d.Stun > 0 {
 				for k := 0; k < 3; k++ {
 					a := t*0.2 + float64(k)*2.09

@@ -48,6 +48,7 @@ type App struct {
 	duelWins  [2]int
 	duelWorld sim.World
 	duelLevel int
+	duelMode  sim.DuelMode
 	bgDust    []dust
 	Headless  bool // без окна (для скриншотов и тестов)
 }

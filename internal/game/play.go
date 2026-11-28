@@ -186,13 +186,14 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 			a.Sound.PlayPickup(e.N)
 			fx.burst(x, y, 16, themes[w].itemGlow, 5, 3, true)
 			fx.ring(x, y, themes[w].itemGlow, 34)
+			if duel {
+				fx.text("+1", x, y-30, duelColors[e.P], 22)
+				break
+			}
 			pts := int(100 * (1 + 0.25*float64(min(e.N, 9)-1)))
 			c := colText
 			if e.N >= 3 {
 				c = colGold
-			}
-			if duel {
-				c = duelColors[e.P]
 			}
 			fx.text("+"+itoa(pts), x, y-30, c, 20)
 		case sim.EvExitOpen:
@@ -241,12 +242,18 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvCursed:
 			a.Sound.Play(sfx.Hit)
 			fx.burst(x, y, 18, rgba(255, 60, 140, 255), 5, 3, true)
-			fx.text("−5 с", x, y-30, colRed, 24)
+			if !duel {
+				fx.text("−5 с", x, y-30, colRed, 24)
+			}
 			fx.shake = math.Max(fx.shake, 5)
 		case sim.EvGolden:
 			a.Sound.PlayPickup(e.N + 2)
 			fx.burst(x, y, 24, colGold, 6, 3, true)
 			fx.ring(x, y, colGold, 46)
+			if duel {
+				fx.text("+"+itoa(sim.DuelGoldenPts), x, y-30, colGold, 24)
+				break
+			}
 			pts := int(sim.GoldenScore * (1 + 0.25*float64(min(e.N, 9)-1)))
 			fx.text("+"+itoa(pts), x, y-30, colGold, 24)
 		case sim.EvVanish:
@@ -276,7 +283,7 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 		case sim.EvKnockout:
 			a.Sound.Play(sfx.Lose)
 			fx.burst(x, y, 40, duelColors[e.N], 7, 4, true)
-			banner("Игрок " + itoa(e.N+1) + " выбит! −" + itoa(sim.DuelKnockPenalty))
+			banner("Игрок " + itoa(e.N+1) + " выбит!")
 		case sim.EvRespawn:
 			a.Sound.Play(sfx.Heal)
 			fx.burst(x, y, 20, duelColors[e.N], 4, 3, true)
@@ -285,6 +292,15 @@ func eventFX(a *App, fx *fxSystem, w sim.World, events []sim.Event, duel bool, b
 			fx.shake = math.Max(fx.shake, 6)
 			fx.burst(x, y, 18, rgba(255, 240, 120, 255), 5, 3, true)
 			fx.text("Оглушён!", x, y-34, duelColors[e.N], 20)
+		case sim.EvLoss:
+			fx.text("−"+itoa(e.P), x, y-58, colRed, 26)
+		case sim.EvDrop:
+			a.Sound.PlayPickup(1)
+			fx.burst(x, y, 14, duelColors[e.N], 4, 3, true)
+		case sim.EvBank:
+			a.Sound.Play(sfx.ExitOpen)
+			fx.burst(x, y, 40, exitGlow, 7, 4, true)
+			fx.text("В банк +"+itoa(e.P), x, y-36, duelColors[e.N], 26)
 		}
 	}
 }

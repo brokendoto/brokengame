@@ -5,7 +5,7 @@
   "RT_MANIFEST": {
     "#1": {
       "0409": {
-        "identity": { "name": "Pyatimirye", "version": "0.13.0.0" },
+        "identity": { "name": "Pyatimirye", "version": "0.14.0.0" },
         "description": "Pyatimirye",
         "minimum-os": "win7",
         "execution-level": "as invoker",
@@ -27,17 +27,17 @@
   "RT_VERSION": {
     "#1": {
       "0000": {
-        "fixed": { "file_version": "0.13.0.0", "product_version": "0.13.0.0" },
+        "fixed": { "file_version": "0.14.0.0", "product_version": "0.14.0.0" },
         "info": {
           "0419": {
             "CompanyName": "brokendoto",
             "FileDescription": "Пятимирье — аркадная игра",
-            "FileVersion": "0.13.0",
+            "FileVersion": "0.14.0",
             "InternalName": "Pyatimirye",
             "LegalCopyright": "© 2026 brokendoto",
             "OriginalFilename": "Pyatimirye.exe",
             "ProductName": "Пятимирье",
-            "ProductVersion": "0.13.0"
+            "ProductVersion": "0.14.0"
           }
         }
       }
