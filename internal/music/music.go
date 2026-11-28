@@ -376,9 +376,24 @@ func drumLen(d Drum) float64 {
 	return 0.12
 }
 
+// Yield, если задан, вызывается во время синтеза примерно раз в 2 тысячи
+// отсчётов. В браузере у Go один поток, и без передышек синтез пьесы
+// (1–2 секунды) замораживал бы игру; там Yield ненадолго отдаёт управление.
+var Yield func()
+
 // Render синтезирует пьесу в 16-битный стерео PCM (little-endian). Конец
 // пьесы бесшовно переходит в начало: хвосты нот заворачиваются в начало.
 func Render(s Style) []byte {
+	work := 0
+	pause := func(n int) {
+		if Yield == nil {
+			return
+		}
+		if work += n; work >= 2048 {
+			work = 0
+			Yield()
+		}
+	}
 	notes, hits, length := compose(s)
 	n := int(length * SampleRate)
 	l := make([]float32, n)
@@ -397,6 +412,7 @@ func Render(s Style) []byte {
 			t := float64(k) / SampleRate
 			add(start+k, voice(nt.inst, f, t, nt.dur)*nt.vel, nt.pan)
 		}
+		pause(cnt)
 	}
 	nr := rng{s.Seed + 99}
 	for _, h := range hits {
@@ -405,15 +421,22 @@ func Render(s Style) []byte {
 		for k := 0; k < cnt; k++ {
 			add(start+k, drum(h.drum, float64(k)/SampleRate, &nr)*h.vel*0.7, 0)
 		}
+		pause(cnt)
 	}
 	// Нормируем по пику.
 	peak := float32(0.001)
 	for i := range l {
+		if i&16383 == 0 {
+			pause(8192)
+		}
 		peak = max(peak, abs32(l[i]), abs32(rr[i]))
 	}
 	g := 0.85 / peak
 	buf := make([]byte, n*4)
 	for i := 0; i < n; i++ {
+		if i&16383 == 0 {
+			pause(8192)
+		}
 		a, b := int16(l[i]*g*32767), int16(rr[i]*g*32767)
 		buf[i*4], buf[i*4+1] = byte(a), byte(a>>8)
 		buf[i*4+2], buf[i*4+3] = byte(b), byte(b>>8)

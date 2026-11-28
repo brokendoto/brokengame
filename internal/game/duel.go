@@ -525,7 +525,10 @@ func (s *duelScene) Draw(a *App, dst *ebiten.Image) {
 
 // drawRoundEnd — итог раунда поверх поля.
 func (s *duelScene) drawRoundEnd(a *App, dst *ebiten.Image) {
-	fillRect(dst, 0, 0, ScreenW, ScreenH, withAlpha(rgba(0, 0, 0, 255), math.Min(0.5, float64(s.endT)/50)))
+	k := math.Min(1, float64(s.endT)/50)
+	fillRect(dst, 0, 0, ScreenW, ScreenH, withAlpha(rgba(0, 0, 0, 255), 0.5*k))
+	// Полоса под надписями, чтобы их не перебивали предметы и враги на поле.
+	fillRect(dst, 0, ScreenH/2-130, ScreenW, 280, withAlpha(rgba(0, 0, 0, 255), 0.45*k))
 	d := s.d
 	txt, c := "Ничья в раунде", colText
 	if d.Winner >= 0 {

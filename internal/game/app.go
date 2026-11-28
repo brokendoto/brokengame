@@ -144,6 +144,7 @@ func (a *App) Update() error {
 		vol = 0
 	}
 	a.Music.update(musicFor(cur), vol)
+	a.prefetchMusic(cur)
 	if len(a.achQueue) > 0 {
 		a.achT++
 		if a.achT > achShowTicks {

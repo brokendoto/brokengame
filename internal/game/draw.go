@@ -111,72 +111,38 @@ func fillRect(dst *ebiten.Image, x, y, w, h float64, c color.Color) {
 }
 
 func fillCircle(dst *ebiten.Image, x, y, r float64, c color.Color) {
-	vector.FillCircle(dst, float32(x), float32(y), float32(r), c, true)
+	if r <= 0 {
+		return
+	}
+	fillShape(dst, circlePts(float32(x), float32(y), float32(r)), c)
 }
 
 func strokeCircle(dst *ebiten.Image, x, y, r, w float64, c color.Color) {
-	vector.StrokeCircle(dst, float32(x), float32(y), float32(r), float32(w), c, true)
+	strokeShape(dst, circlePts(float32(x), float32(y), float32(r)), true, float32(w), c)
 }
 
 func line(dst *ebiten.Image, x0, y0, x1, y1, w float64, c color.Color) {
-	vector.StrokeLine(dst, float32(x0), float32(y0), float32(x1), float32(y1), float32(w), c, true)
-}
-
-func colorScale(c color.Color) ebiten.ColorScale {
-	var cs ebiten.ColorScale
-	cs.ScaleWithColor(c)
-	return cs
+	shapePts = append(shapePts[:0], vec{float32(x0), float32(y0)}, vec{float32(x1), float32(y1)})
+	strokeShape(dst, shapePts, false, float32(w), c)
 }
 
 // fillPoly заливает многоугольник.
 func fillPoly(dst *ebiten.Image, pts []float64, c color.Color) {
-	var p vector.Path
+	shapePts = shapePts[:0]
 	for i := 0; i+1 < len(pts); i += 2 {
-		if i == 0 {
-			p.MoveTo(float32(pts[i]), float32(pts[i+1]))
-		} else {
-			p.LineTo(float32(pts[i]), float32(pts[i+1]))
-		}
+		shapePts = append(shapePts, vec{float32(pts[i]), float32(pts[i+1])})
 	}
-	p.Close()
-	vector.FillPath(dst, &p, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(c)})
+	fillShape(dst, shapePts, c)
 }
 
 // roundRect — прямоугольник со скруглёнными углами.
 func roundRect(dst *ebiten.Image, x, y, w, h, r float64, c color.Color) {
-	var p vector.Path
-	rr := float32(r)
-	x0, y0, x1, y1 := float32(x), float32(y), float32(x+w), float32(y+h)
-	p.MoveTo(x0+rr, y0)
-	p.LineTo(x1-rr, y0)
-	p.ArcTo(x1, y0, x1, y0+rr, rr)
-	p.LineTo(x1, y1-rr)
-	p.ArcTo(x1, y1, x1-rr, y1, rr)
-	p.LineTo(x0+rr, y1)
-	p.ArcTo(x0, y1, x0, y1-rr, rr)
-	p.LineTo(x0, y0+rr)
-	p.ArcTo(x0, y0, x0+rr, y0, rr)
-	p.Close()
-	vector.FillPath(dst, &p, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(c)})
+	fillShape(dst, roundRectPts(float32(x), float32(y), float32(w), float32(h), float32(r)), c)
 }
 
 // roundRectStroke — обводка скруглённого прямоугольника.
 func roundRectStroke(dst *ebiten.Image, x, y, w, h, r, sw float64, c color.Color) {
-	var p vector.Path
-	rr := float32(r)
-	x0, y0, x1, y1 := float32(x), float32(y), float32(x+w), float32(y+h)
-	p.MoveTo(x0+rr, y0)
-	p.LineTo(x1-rr, y0)
-	p.ArcTo(x1, y0, x1, y0+rr, rr)
-	p.LineTo(x1, y1-rr)
-	p.ArcTo(x1, y1, x1-rr, y1, rr)
-	p.LineTo(x0+rr, y1)
-	p.ArcTo(x0, y1, x0, y1-rr, rr)
-	p.LineTo(x0, y0+rr)
-	p.ArcTo(x0, y0, x0+rr, y0, rr)
-	p.Close()
-	vector.StrokePath(dst, &p, &vector.StrokeOptions{Width: float32(sw), LineJoin: vector.LineJoinRound},
-		&vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(c)})
+	strokeShape(dst, roundRectPts(float32(x), float32(y), float32(w), float32(h), float32(r)), true, float32(sw), c)
 }
 
 // Спрайт мягкого свечения: радиальный градиент, рисуется аддитивно.
